@@ -4,11 +4,20 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import { Button, StatusBadge } from '@/components/ui/primitives';
+import { SurfacePanel } from '@/components/layout/page-shell';
 import { identityService, membershipService } from '@/services';
 import { useRouter } from '@/i18n/navigation';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 export default function WelcomeDiscordPage() {
   const t = useTranslations('welcome');
@@ -82,45 +91,68 @@ export default function WelcomeDiscordPage() {
   }
 
   return (
-    <section className="onboarding-stage">
-      <span className="eyebrow">{t('step', { current: 1, total: 3 })}</span>
-      <h1>{t('discordTitle')}</h1>
-      <p className="onboarding-lead">{t('discordBody')}</p>
+    <Card className="auth-panel overflow-hidden border-0 shadow-none">
+      <CardHeader className="space-y-3">
+        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#5865F2]/10 px-3 py-1 text-xs font-medium text-[#5865F2]">
+          <MessageCircle className="size-3.5" aria-hidden />
+          Discord
+        </span>
+        <CardTitle className="text-xl font-semibold">{t('discordTitle')}</CardTitle>
+        <CardDescription className="text-base leading-relaxed">
+          {t('discordBody')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <SurfacePanel className="space-y-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{t('discordStatus')}</span>
+            <StatusBadge status={discord ? 'VERIFIED' : 'UNKNOWN'} />
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{t('membershipStatus')}</span>
+            <StatusBadge
+              status={
+                eligible ? 'ELIGIBLE' : discord ? 'NOT_MEMBER' : 'UNKNOWN'
+              }
+            />
+          </div>
+          {discord?.providerUsername ? (
+            <p className="text-sm font-medium">@{discord.providerUsername}</p>
+          ) : null}
+        </SurfacePanel>
 
-      <div className="onboarding-card">
-        <div className="info">
-          <span>{t('discordStatus')}</span>
-          <StatusBadge status={discord ? 'VERIFIED' : 'UNKNOWN'} />
+        <div className="flex flex-col gap-2">
+          {!discord && !oauthMissing ? (
+            <Button
+              className="h-11 w-full font-semibold"
+              disabled={busy}
+              onClick={() => void connectDiscord()}
+            >
+              {t('connectDiscord')}
+            </Button>
+          ) : discord && !eligible && !oauthMissing ? (
+            <Button
+              className="h-11 w-full font-semibold"
+              disabled={busy}
+              onClick={() => void recheck()}
+            >
+              {tc('recheck')}
+            </Button>
+          ) : null}
+          {canContinue ? (
+            <Button
+              className="h-11 w-full font-semibold"
+              onClick={() => router.push('/welcome/optional')}
+            >
+              {oauthMissing ? t('continueWithoutOauth') : tc('continue')}
+            </Button>
+          ) : (
+            <p className="text-center text-sm text-muted-foreground">
+              {t('discordRequired')}
+            </p>
+          )}
         </div>
-        <div className="info">
-          <span>{t('membershipStatus')}</span>
-          <StatusBadge
-            status={eligible ? 'ACTIVE' : discord ? 'NOT_MEMBER' : 'UNKNOWN'}
-          />
-        </div>
-        {discord?.providerUsername ? (
-          <p className="muted">@{discord.providerUsername}</p>
-        ) : null}
-      </div>
-
-      <div className="onboarding-actions">
-        {!discord && !oauthMissing ? (
-          <Button className="btn-wide" disabled={busy} onClick={() => void connectDiscord()}>
-            {t('connectDiscord')}
-          </Button>
-        ) : discord && !eligible && !oauthMissing ? (
-          <Button className="btn-wide" disabled={busy} onClick={() => void recheck()}>
-            {tc('recheck')}
-          </Button>
-        ) : null}
-        {canContinue ? (
-          <Button className="btn-wide" onClick={() => router.push('/welcome/optional')}>
-            {oauthMissing ? t('continueWithoutOauth') : tc('continue')}
-          </Button>
-        ) : (
-          <p className="muted">{t('discordRequired')}</p>
-        )}
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

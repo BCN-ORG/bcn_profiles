@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { useStatusLabel } from '@/hooks/use-status-label';
 import { Button, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { formatDate } from '@/lib/utils';
 import {
@@ -12,8 +13,33 @@ import {
   applicationService,
   auditService,
   membershipService,
+  securityService,
 } from '@/services';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { PageShell } from '@/components/layout/page-shell';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function AdminUserDetailPage() {
   const params = useParams<{ userId: string }>();
@@ -21,7 +47,10 @@ export default function AdminUserDetailPage() {
   const t = useTranslations('admin');
   const tc = useTranslations('common');
   const tm = useTranslations('membership');
+  const ts = useTranslations('security');
+  const label = useStatusLabel();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const user = useQuery({
     queryKey: ['admin', 'user', userId],
@@ -38,6 +67,10 @@ export default function AdminUserDetailPage() {
   const audit = useQuery({
     queryKey: ['admin', 'user', userId, 'audit'],
     queryFn: () => auditService.list({ userId, limit: 10 }),
+  });
+  const twoFa = useQuery({
+    queryKey: ['admin', 'user', userId, '2fa'],
+    queryFn: () => securityService.adminStatus(userId),
   });
 
   const [overrideStatus, setOverrideStatus] = useState<'ALLOW' | 'DENY'>('ALLOW');
@@ -57,6 +90,9 @@ export default function AdminUserDetailPage() {
       }),
       queryClient.invalidateQueries({
         queryKey: ['admin', 'user', userId, 'audit'],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ['admin', 'user', userId, '2fa'],
       }),
     ]);
   };
@@ -94,226 +130,339 @@ export default function AdminUserDetailPage() {
   if (!user.data) return <p>{tc('error')}</p>;
 
   return (
-    <div className="stack">
+    <PageShell>
       <PageHeader
         title={user.data.fullName || user.data.email}
         description={t('userDetail')}
         actions={
-          <Link className="btn btn-ghost" href="/admin/users">
-            {tc('back')}
-          </Link>
+          <Button asChild variant="ghost">
+            <Link href="/admin/users">{tc('back')}</Link>
+          </Button>
         }
       />
 
-      <section className="card stack">
-        <div className="info">
-          <span>Email</span>
-          <strong>{user.data.email}</strong>
-        </div>
-        <div className="info">
-          <span>Status</span>
-          <StatusBadge status={user.data.status || 'ACTIVE'} />
-        </div>
-        <div className="actions">
-          {user.data.status === 'PENDING' ? (
-            <>
-              <Button onClick={() => act.mutate('approve')}>{t('approve')}</Button>
-              <Button variant="danger" onClick={() => act.mutate('reject')}>
-                {t('reject')}
+      <Card>
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{t('email')}</span>
+            <strong>{user.data.email}</strong>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{t('status')}</span>
+            <StatusBadge status={user.data.status || 'ACTIVE'} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {user.data.status === 'PENDING' ? (
+              <>
+                <Button onClick={() => act.mutate('approve')}>
+                  {t('approve')}
+                </Button>
+                <Button variant="danger" onClick={() => act.mutate('reject')}>
+                  {t('reject')}
+                </Button>
+              </>
+            ) : null}
+            {user.data.status === 'ACTIVE' ? (
+              <Button variant="danger" onClick={() => act.mutate('block')}>
+                {t('block')}
               </Button>
-            </>
-          ) : null}
-          {user.data.status === 'ACTIVE' ? (
-            <Button variant="danger" onClick={() => act.mutate('block')}>
-              {t('block')}
+            ) : null}
+            {user.data.status === 'BLOCKED' ? (
+              <Button onClick={() => act.mutate('unblock')}>
+                {t('unblock')}
+              </Button>
+            ) : null}
+            <Button
+              variant="secondary"
+              onClick={() =>
+                void membershipService
+                  .adminRecheck(userId)
+                  .then(async () => {
+                    await invalidate();
+                    toast.success(tm('recheckSuccess'));
+                  })
+                  .catch((e: Error) => toast.error(e.message))
+              }
+            >
+              {tc('recheck')}
             </Button>
-          ) : null}
-          {user.data.status === 'BLOCKED' ? (
-            <Button onClick={() => act.mutate('unblock')}>{t('unblock')}</Button>
-          ) : null}
-          <Button
-            variant="secondary"
-            onClick={() =>
-              void membershipService
-                .adminRecheck(userId)
-                .then(async () => {
-                  await invalidate();
-                  toast.success(tm('recheckSuccess'));
-                })
-                .catch((e: Error) => toast.error(e.message))
-            }
-          >
-            {tc('recheck')}
-          </Button>
-        </div>
-      </section>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (!window.confirm(t('deleteConfirm'))) return;
+                void adminUserService
+                  .remove(userId)
+                  .then(() => {
+                    toast.success(t('deleted'));
+                    router.replace('/admin/users');
+                  })
+                  .catch((e: Error) => toast.error(e.message));
+              }}
+            >
+              {t('deleteUser')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-      <section className="grid two">
-        <article className="card stack">
-          <h3>{tm('title')}</h3>
+      <Card>
+        <CardHeader className="flex-row items-start justify-between space-y-0">
+          <div>
+            <CardTitle>{ts('twoFactor')}</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {twoFa.data?.twoFactorRequired
+                ? t('twoFaRequired')
+                : t('twoFaOptional')}
+            </p>
+          </div>
           <StatusBadge
-            status={membership.data?.eligible ? tm('eligible') : tm('notEligible')}
+            status={twoFa.data?.twoFactorEnabled ? 'TWO_FA_ON' : 'TWO_FA_OFF'}
           />
-          <p className="muted">{membership.data?.policy}</p>
-          <div className="info">
-            <span>{tm('discord')}</span>
-            <StatusBadge
-              status={membership.data?.sources.discord?.status || 'UNKNOWN'}
-            />
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() =>
+                void securityService
+                  .adminRequire(userId)
+                  .then(async () => {
+                    await invalidate();
+                    toast.success(t('updated'));
+                  })
+                  .catch((e: Error) => toast.error(e.message))
+              }
+            >
+              {t('require2fa')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() =>
+                void securityService
+                  .adminUnrequire(userId)
+                  .then(async () => {
+                    await invalidate();
+                    toast.success(t('updated'));
+                  })
+                  .catch((e: Error) => toast.error(e.message))
+              }
+            >
+              {t('unrequire2fa')}
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() =>
+                void securityService
+                  .adminReset(userId, 'Admin reset')
+                  .then(async () => {
+                    await invalidate();
+                    toast.success(t('updated'));
+                  })
+                  .catch((e: Error) => toast.error(e.message))
+              }
+            >
+              {t('reset2fa')}
+            </Button>
           </div>
-          <div className="info">
-            <span>{tm('zalo')}</span>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>{tm('title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <StatusBadge
-              status={membership.data?.sources.zalo?.status || 'UNKNOWN'}
+              status={membership.data?.eligible ? 'ELIGIBLE' : 'NOT_ELIGIBLE'}
             />
-          </div>
-          <form className="form-grid" onSubmit={submitOverride}>
-            <h4>{t('overrideTitle')}</h4>
-            <label>
-              Status
-              <select
-                value={overrideStatus}
-                onChange={(e) =>
-                  setOverrideStatus(e.target.value as 'ALLOW' | 'DENY')
-                }
-              >
-                <option value="ALLOW">ALLOW</option>
-                <option value="DENY">DENY</option>
-              </select>
-            </label>
-            <label>
-              {t('overrideReason')}
-              <input
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                required
-                minLength={3}
+            <p className="text-sm text-muted-foreground">
+              {label(membership.data?.policy || 'ANY_TRUSTED_GROUP')}
+            </p>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{tm('discord')}</span>
+              <StatusBadge
+                status={membership.data?.sources.discord?.status || 'UNKNOWN'}
               />
-            </label>
-            <label>
-              {t('overrideExpires')}
-              <input
-                type="datetime-local"
-                value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
-                required
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{tm('zalo')}</span>
+              <StatusBadge
+                status={membership.data?.sources.zalo?.status || 'UNKNOWN'}
               />
-            </label>
-            <Button type="submit">{tc('save')}</Button>
-          </form>
-        </article>
+            </div>
+            <form className="grid gap-4 border-t pt-4" onSubmit={submitOverride}>
+              <h4 className="font-medium">{t('overrideTitle')}</h4>
+              <div className="space-y-2">
+                <Label>{t('overrideStatus')}</Label>
+                <Select
+                  value={overrideStatus}
+                  onValueChange={(value) =>
+                    setOverrideStatus(value as 'ALLOW' | 'DENY')
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALLOW">{label('ALLOW')}</SelectItem>
+                    <SelectItem value="DENY">{label('DENY')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t('overrideReason')}</Label>
+                <Input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  required
+                  minLength={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t('overrideExpires')}</Label>
+                <Input
+                  type="datetime-local"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit">{tc('save')}</Button>
+            </form>
+          </CardContent>
+        </Card>
 
-        <article className="card stack">
-          <h3>Applications</h3>
-          {apps.data?.map((app) => (
-            <div className="info" key={app.code}>
-              <span>
-                {app.name} ({app.code})
-                <br />
-                <small className="muted">{app.roles.join(', ') || '—'}</small>
-              </span>
-              <StatusBadge status={app.access} />
-            </div>
-          ))}
-          <form
-            className="form-grid"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void applicationService
-                .grant(userId, appCode)
-                .then(async () => {
-                  await invalidate();
-                  toast.success(t('updated'));
-                })
-                .catch((e: Error) => toast.error(e.message));
-            }}
-          >
-            <label>
-              App code
-              <input value={appCode} onChange={(e) => setAppCode(e.target.value)} />
-            </label>
-            <div className="actions">
-              <Button type="submit">{t('grantApp')}</Button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() =>
-                  void applicationService
-                    .block(userId, appCode)
-                    .then(async () => {
-                      await invalidate();
-                      toast.success(t('updated'));
-                    })
-                    .catch((e: Error) => toast.error(e.message))
-                }
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('applications')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {apps.data?.map((app) => (
+              <div
+                key={app.code}
+                className="flex items-start justify-between gap-4 text-sm"
               >
-                {t('blockApp')}
-              </Button>
-            </div>
-          </form>
-          <form
-            className="form-grid"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void applicationService
-                .assignRole(userId, appCode, roleCode)
-                .then(async () => {
-                  await invalidate();
-                  toast.success(t('updated'));
-                })
-                .catch((e: Error) => toast.error(e.message));
-            }}
-          >
-            <label>
-              Role
-              <input
-                value={roleCode}
-                onChange={(e) => setRoleCode(e.target.value)}
-              />
-            </label>
-            <div className="actions">
-              <Button type="submit">{t('assignRole')}</Button>
-              <Button
-                type="button"
-                variant="danger"
-                onClick={() =>
-                  void applicationService
-                    .removeRole(userId, appCode, roleCode)
-                    .then(async () => {
-                      await invalidate();
-                      toast.success(t('updated'));
-                    })
-                    .catch((e: Error) => toast.error(e.message))
-                }
-              >
-                {t('removeRole')}
-              </Button>
-            </div>
-          </form>
-        </article>
-      </section>
-
-      <section className="table-card">
-        <h3>{t('auditTitle')}</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Event</th>
-              <th>App</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {audit.data?.data.map((item) => (
-              <tr key={item.id}>
-                <td>{item.eventType}</td>
-                <td>{item.applicationCode || '—'}</td>
-                <td>{formatDate(item.createdAt)}</td>
-              </tr>
+                <span>
+                  {app.name} ({app.code})
+                  <br />
+                  <small className="text-muted-foreground">
+                    {app.roles.map((role) => label(role)).join(', ') || '—'}
+                  </small>
+                </span>
+                <StatusBadge status={app.access} />
+              </div>
             ))}
-          </tbody>
-        </table>
-      </section>
-    </div>
+            <form
+              className="grid gap-4 border-t pt-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applicationService
+                  .grant(userId, appCode)
+                  .then(async () => {
+                    await invalidate();
+                    toast.success(t('updated'));
+                  })
+                  .catch((e: Error) => toast.error(e.message));
+              }}
+            >
+              <div className="space-y-2">
+                <Label>App code</Label>
+                <Input
+                  value={appCode}
+                  onChange={(e) => setAppCode(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit">{t('grantApp')}</Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() =>
+                    void applicationService
+                      .block(userId, appCode)
+                      .then(async () => {
+                        await invalidate();
+                        toast.success(t('updated'));
+                      })
+                      .catch((e: Error) => toast.error(e.message))
+                  }
+                >
+                  {t('blockApp')}
+                </Button>
+              </div>
+            </form>
+            <form
+              className="grid gap-4 border-t pt-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applicationService
+                  .assignRole(userId, appCode, roleCode)
+                  .then(async () => {
+                    await invalidate();
+                    toast.success(t('updated'));
+                  })
+                  .catch((e: Error) => toast.error(e.message));
+              }}
+            >
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Input
+                  value={roleCode}
+                  onChange={(e) => setRoleCode(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit">{t('assignRole')}</Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() =>
+                    void applicationService
+                      .removeRole(userId, appCode, roleCode)
+                      .then(async () => {
+                        await invalidate();
+                        toast.success(t('updated'));
+                      })
+                      .catch((e: Error) => toast.error(e.message))
+                  }
+                >
+                  {t('removeRole')}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('auditTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Event</TableHead>
+                <TableHead>App</TableHead>
+                <TableHead>Time</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {audit.data?.data.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>{item.eventType}</TableCell>
+                  <TableCell>{item.applicationCode || '—'}</TableCell>
+                  <TableCell>{formatDate(item.createdAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </PageShell>
   );
 }

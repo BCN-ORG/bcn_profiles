@@ -8,8 +8,22 @@ import type {
   UserSession,
 } from '@/types';
 
+export type TimelineEvent = {
+  id: number;
+  eventType: string;
+  title: string;
+  metadata?: unknown;
+  createdAt: string;
+};
+
 export const authService = {
   me: () => request.get<{ user: User }>('/auth/me').then((r) => r.user),
+  register: (body: {
+    email: string;
+    password: string;
+    fullName: string;
+    phone: string;
+  }) => request.post('/auth/register', body),
   login: (email: string, password: string) =>
     request.post<{
       requiresTwoFactorSetup?: boolean;
@@ -19,6 +33,15 @@ export const authService = {
       user?: User;
     }>('/auth/login', { email, password }),
   logout: () => request.post('/auth/logout'),
+  refresh: () => request.post('/auth/refresh'),
+  forgotPassword: (email: string) =>
+    request.post('/auth/forgot-password', { email }),
+  resetPassword: (email: string, otp: string, newPassword: string) =>
+    request.post('/auth/reset-password', { email, otp, newPassword }),
+  requestEmailChange: (newEmail: string) =>
+    request.post('/auth/change-email/request', { newEmail }),
+  confirmEmailChange: (newEmail: string, otp: string) =>
+    request.post('/auth/change-email/confirm', { newEmail, otp }),
   beginSocial: (provider: string) =>
     request.get<{ authorizationUrl: string }>(
       `/auth/social/${provider.toLowerCase()}`,
@@ -49,20 +72,47 @@ export const authService = {
       { code, secret },
       { Authorization: `Bearer ${token}` },
     ),
-  beginDiscordMembership: (email: string, password: string) =>
-    request.post<{ authorizationUrl: string }>('/auth/membership/discord', {
-      email,
-      password,
-    }),
+  recoveryRequest: (email: string) =>
+    request.post('/auth/2fa/recovery/request', { email }),
+  recoveryVerify: (email: string, recoveryOtp: string) =>
+    request.post<{ recoveryToken: string }>(
+      '/auth/2fa/recovery/verify-email',
+      { email, recoveryOtp },
+    ),
+  recoveryReset: (password: string, recoveryToken: string) =>
+    request.post(
+      '/auth/2fa/recovery/reset',
+      { password },
+      { Authorization: `Bearer ${recoveryToken}` },
+    ),
 };
 
 export const profileService = {
   update: (data: {
     fullName?: string;
     phone?: string;
+    avatar?: string | null;
+    avatarPublicId?: string | null;
     metadata?: { onboardingVersion?: number };
   }) =>
     request.patch<{ users: User }>('/users/me', data).then((r) => r.users),
+  avatarSignature: () =>
+    request.post<{
+      uploadUrl: string;
+      publicId: string;
+      secureUrl: string;
+      method: string;
+      maxBytes: number;
+      expiresAt: string;
+    }>('/users/me/avatar/upload-signature', {}),
+  setAvatar: (avatar: string, avatarPublicId: string) =>
+    request
+      .patch<{ users: User }>('/users/me/avatar', {
+        avatar,
+        avatarPublicId,
+      })
+      .then((r) => r.users),
+  clearAvatar: () => request.delete<{ users: User }>('/users/me/avatar'),
 };
 
 export const identityService = {
@@ -102,6 +152,10 @@ export const applicationService = {
     request.post(`/admin/users/${userId}/applications/${app}/grant`),
   block: (userId: string, app: string) =>
     request.post(`/admin/users/${userId}/applications/${app}/block`),
+  listRoles: (userId: string, app: string) =>
+    request.get<string[]>(
+      `/admin/users/${userId}/applications/${app}/roles`,
+    ),
   assignRole: (userId: string, app: string, role: string) =>
     request.post(`/admin/users/${userId}/applications/${app}/roles/${role}`),
   removeRole: (userId: string, app: string, role: string) =>
@@ -117,31 +171,136 @@ export const sessionService = {
 
 export const securityService = {
   status: () =>
-    request
-      .get<{
-        twoFactorEnabled: boolean;
-        twoFactorRequired?: boolean;
-        backupCodesRemaining?: number;
-      }>('/auth/2fa/me/status')
-      .then((r) => ({
-        enabled: r.twoFactorEnabled,
-        required: r.twoFactorRequired,
-      })),
-  disable: (password: string) =>
-    request.post('/auth/2fa/me/disable', { password }),
+    request.get<{
+      twoFactorEnabled: boolean;
+      twoFactorRequired?: boolean;
+      backupCodesRemaining?: number;
+    }>('/auth/2fa/me/status'),
+  enableInitiate: (password: string) =>
+    request.post<{ secret: string; qrCode: string; setupToken: string }>(
+      '/auth/2fa/me/enable/initiate',
+      { password },
+    ),
+  enableConfirm: (code: string, secret: string, setupToken: string) =>
+    request.post<{ backupCodes?: string[] }>(
+      '/auth/2fa/me/enable/confirm',
+      { code, secret },
+      { Authorization: `Bearer ${setupToken}` },
+    ),
+  disable: (password: string, totpCode: string) =>
+    request.post('/auth/2fa/me/disable', { password, totpCode }),
+  adminStatus: (userId: string) =>
+    request.get<{
+      twoFactorEnabled: boolean;
+      twoFactorRequired?: boolean;
+    }>(`/auth/2fa/admin/status/${userId}`),
+  adminReset: (userId: string, reason?: string) =>
+    request.post(`/auth/2fa/admin/reset/${userId}`, reason ? { reason } : {}),
+  adminRequire: (userId: string) =>
+    request.post(`/auth/2fa/admin/require/${userId}`),
+  adminUnrequire: (userId: string) =>
+    request.post(`/auth/2fa/admin/unrequire/${userId}`),
 };
 
 export const adminUserService = {
-  list: (search = '') =>
-    request.get<{ data: User[] }>(
-      `/users?page=1&limit=50&search=${encodeURIComponent(search)}`,
-    ),
+  list: (search = '', opts?: { pending?: boolean; page?: number }) => {
+    const q = new URLSearchParams({
+      page: String(opts?.page ?? 1),
+      limit: '50',
+      search,
+    });
+    const path = opts?.pending ? `/users/pending?${q}` : `/users?${q}`;
+    return request.get<{ data: User[]; meta?: { total: number } }>(path);
+  },
+  count: () => request.get<{ count: number }>('/users/count'),
   get: (id: string) =>
     request.get<{ users: User }>(`/users/${id}`).then((r) => r.users),
+  create: (body: {
+    email: string;
+    password: string;
+    fullName?: string;
+    phone?: string;
+  }) => request.post('/users', body),
+  remove: (id: string) => request.delete(`/users/${id}`),
   approve: (id: string) => request.patch(`/users/${id}/approve`),
   reject: (id: string) => request.delete(`/users/${id}/reject`),
   block: (id: string) => request.patch(`/users/${id}/block`),
   unblock: (id: string) => request.patch(`/users/${id}/unblock`),
+};
+
+export type RbacApplication = {
+  id: string;
+  code: string;
+  name: string;
+  clientId: string;
+  status: 'ACTIVE' | 'DISABLED';
+  require2fa: boolean;
+  redirectUris: { id: string; redirectUri: string }[];
+  roles: {
+    id: string;
+    code: string;
+    name: string;
+    permissions: {
+      permission: { id: string; code: string; description?: string | null };
+    }[];
+  }[];
+  permissions: { id: string; code: string; description?: string | null }[];
+  _count?: { userAccess: number; userAppRoles?: number };
+};
+
+export type RbacAppUser = {
+  id: string;
+  status: string;
+  createdAt: string;
+  user: { id: string; email: string; fullName: string; status: string };
+};
+
+export const rbacService = {
+  listApps: () => request.get<RbacApplication[]>('/admin/applications'),
+  getApp: (code: string) =>
+    request.get<RbacApplication>(`/admin/applications/${code}`),
+  createApp: (body: {
+    code: string;
+    name: string;
+    clientId: string;
+    require2fa?: boolean;
+    redirectUri?: string;
+  }) => request.post<RbacApplication>('/admin/applications', body),
+  updateApp: (
+    code: string,
+    body: {
+      name?: string;
+      clientId?: string;
+      status?: 'ACTIVE' | 'DISABLED';
+      require2fa?: boolean;
+    },
+  ) => request.patch<RbacApplication>(`/admin/applications/${code}`, body),
+  addRedirectUri: (code: string, redirectUri: string) =>
+    request.post(`/admin/applications/${code}/redirect-uris`, { redirectUri }),
+  removeRedirectUri: (code: string, redirectUri: string) =>
+    request.delete(`/admin/applications/${code}/redirect-uris`, {
+      redirectUri,
+    }),
+  createRole: (code: string, body: { code: string; name?: string }) =>
+    request.post(`/admin/applications/${code}/roles`, body),
+  deleteRole: (code: string, role: string) =>
+    request.delete(`/admin/applications/${code}/roles/${role}`),
+  createPermission: (
+    code: string,
+    body: { code: string; description?: string },
+  ) => request.post(`/admin/applications/${code}/permissions`, body),
+  deletePermission: (code: string, permission: string) =>
+    request.delete(`/admin/applications/${code}/permissions/${permission}`),
+  grantRolePermission: (code: string, role: string, permission: string) =>
+    request.post(
+      `/admin/applications/${code}/roles/${role}/permissions/${permission}`,
+    ),
+  revokeRolePermission: (code: string, role: string, permission: string) =>
+    request.delete(
+      `/admin/applications/${code}/roles/${role}/permissions/${permission}`,
+    ),
+  listAppUsers: (code: string) =>
+    request.get<RbacAppUser[]>(`/admin/applications/${code}/users`),
 };
 
 export const auditService = {
@@ -156,4 +315,17 @@ export const auditService = {
       meta: { total: number; page: number; limit: number; totalPages: number };
     }>(`/admin/audit${suffix}`);
   },
+};
+
+export const timelineService = {
+  mine: (page = 1, limit = 20) =>
+    request.get<TimelineEvent[]>(
+      `/timeline-events/my-timeline?page=${page}&limit=${limit}`,
+    ),
+  create: (body: {
+    eventType: string;
+    title: string;
+    metadata?: Record<string, unknown>;
+  }) => request.post<TimelineEvent>('/timeline-events', body),
+  remove: (id: number) => request.delete(`/timeline-events/${id}`),
 };

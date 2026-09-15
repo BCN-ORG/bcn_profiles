@@ -4,9 +4,19 @@ import { FormEvent, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import { Link } from '@/i18n/navigation';
 import { Button, PageHeader, StatusBadge } from '@/components/ui/primitives';
-import { request } from '@/lib/api';
 import { securityService } from '@/services';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { PageShell } from '@/components/layout/page-shell';
 
 export default function SecurityPage() {
   const t = useTranslations('security');
@@ -19,6 +29,8 @@ export default function SecurityPage() {
   });
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [setup, setSetup] = useState<{
     token: string;
     secret?: string;
@@ -26,15 +38,13 @@ export default function SecurityPage() {
   } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const enabled = Boolean(status.data?.twoFactorEnabled);
+
   async function startEnable(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      const result = await request.post<{
-        secret: string;
-        qrCode: string;
-        setupToken: string;
-      }>('/auth/2fa/me/enable/initiate', { password });
+      const result = await securityService.enableInitiate(password);
       setSetup({
         token: result.setupToken,
         secret: result.secret,
@@ -52,11 +62,12 @@ export default function SecurityPage() {
     if (!setup?.secret) return;
     setBusy(true);
     try {
-      await request.post(
-        '/auth/2fa/me/enable/confirm',
-        { code, secret: setup.secret },
-        { Authorization: `Bearer ${setup.token}` },
+      const result = await securityService.enableConfirm(
+        code,
+        setup.secret,
+        setup.token,
       );
+      setBackupCodes(result.backupCodes || []);
       setSetup(null);
       setCode('');
       setPassword('');
@@ -73,10 +84,11 @@ export default function SecurityPage() {
     event.preventDefault();
     setBusy(true);
     try {
-      await securityService.disable(password);
+      await securityService.disable(password, totpCode);
       await queryClient.invalidateQueries({ queryKey: ['me', '2fa'] });
       toast.success(t('disabled'));
       setPassword('');
+      setTotpCode('');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tc('error'));
     } finally {
@@ -85,60 +97,102 @@ export default function SecurityPage() {
   }
 
   return (
-    <div className="stack">
+    <PageShell>
       <PageHeader title={t('title')} />
-      <article className="card stack">
-        <div className="provider-head">
+      <Card>
+        <CardHeader className="flex-row items-start justify-between space-y-0">
           <div>
-            <h3>{t('twoFactor')}</h3>
-            <p className="muted">{t('recommended')}</p>
+            <CardTitle>{t('twoFactor')}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t('recommended')}</p>
+            {typeof status.data?.backupCodesRemaining === 'number' ? (
+              <p className="text-sm text-muted-foreground">
+                {t('backupLeft', { count: status.data.backupCodesRemaining })}
+              </p>
+            ) : null}
           </div>
-          <StatusBadge
-            status={status.data?.enabled ? t('enabled') : t('disabled')}
-          />
-        </div>
+          <StatusBadge status={enabled ? 'TWO_FA_ON' : 'TWO_FA_OFF'} />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {backupCodes.length > 0 ? (
+            <Alert>
+              <AlertDescription>
+                {t('saveBackup')} {backupCodes.join(' · ')}
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
-        {status.data?.enabled ? (
-          <form className="form-grid" onSubmit={disable}>
-            <label>
-              {t('password')}
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
+          {enabled ? (
+            <form className="grid gap-4 md:grid-cols-2" onSubmit={disable}>
+              <div className="space-y-2">
+                <Label>{t('password')}</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t('totpCode')}</Label>
+                <Input
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Button variant="danger" disabled={busy}>
+                  {t('disable')}
+                </Button>
+              </div>
+            </form>
+          ) : setup?.qrCode ? (
+            <form className="grid gap-4" onSubmit={confirmEnable}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="mx-auto w-48 rounded-lg border"
+                src={setup.qrCode}
+                alt="QR"
               />
-            </label>
-            <Button variant="danger" disabled={busy}>
-              {t('disable')}
-            </Button>
-          </form>
-        ) : setup?.qrCode ? (
-          <form className="form-grid" onSubmit={confirmEnable}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="qr" src={setup.qrCode} alt="QR" />
-            <code className="secret">{setup.secret}</code>
-            <label>
-              {tl('code')}
-              <input value={code} onChange={(e) => setCode(e.target.value)} required />
-            </label>
-            <Button disabled={busy}>{tc('confirm')}</Button>
-          </form>
-        ) : (
-          <form className="form-grid" onSubmit={startEnable}>
-            <label>
-              {t('password')}
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </label>
-            <Button disabled={busy}>{t('enable')}</Button>
-          </form>
-        )}
-      </article>
-    </div>
+              <code className="block rounded-md bg-muted px-3 py-2 text-center text-sm">
+                {setup.secret}
+              </code>
+              <div className="space-y-2">
+                <Label>{tl('code')}</Label>
+                <Input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                />
+              </div>
+              <Button disabled={busy}>{tc('confirm')}</Button>
+            </form>
+          ) : (
+            <form className="grid gap-4 md:grid-cols-2" onSubmit={startEnable}>
+              <div className="space-y-2">
+                <Label>{t('password')}</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex items-end">
+                <Button disabled={busy}>{t('enable')}</Button>
+              </div>
+            </form>
+          )}
+
+          <p className="text-sm text-muted-foreground">
+            <Link href="/2fa-recovery" className="hover:text-foreground">
+              {t('lostAccess')}
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    </PageShell>
   );
 }

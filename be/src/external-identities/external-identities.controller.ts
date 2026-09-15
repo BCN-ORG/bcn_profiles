@@ -20,6 +20,7 @@ import { IdentitySessionService } from '../identity/session.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExternalIdentitiesService } from './external-identities.service';
 import { LoginDto } from '../auth/dto/login.dto';
+import { setSsoCookie } from '../common/cookies/sso-cookie';
 
 type CurrentUser = { id: string };
 
@@ -86,6 +87,7 @@ export class ExternalIdentitiesController {
     @Query('state') state: string,
     @Query('code') code: string,
     @Query('error') oauthError: string,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const frontend = this.frontendUrl();
@@ -132,13 +134,7 @@ export class ExternalIdentitiesController {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
       if (tokens.sso_session_id) {
-        response.cookie('bcn_sso', tokens.sso_session_id, {
-          httpOnly: true,
-          secure: production,
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 30 * 24 * 60 * 60 * 1000,
-        });
+        setSsoCookie(response, request, tokens.sso_session_id);
       }
       if (frontend) {
         response.redirect(frontend);

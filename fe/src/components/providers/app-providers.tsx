@@ -2,13 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { Toaster } from 'sonner';
-import { ThemeProvider, useTheme } from '@/components/theme/theme-provider';
-
-function ThemedToaster() {
-  const { theme } = useTheme();
-  return <Toaster richColors position="top-right" theme={theme} />;
-}
+import { ThemeProvider } from '@/components/theme/theme-provider';
+import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -27,8 +23,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <ThemeProvider>
-        {children}
-        <ThemedToaster />
+        <TooltipProvider>
+          {children}
+          <Toaster richColors position="top-right" />
+        </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

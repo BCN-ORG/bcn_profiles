@@ -8,8 +8,8 @@ import {
 
 export class SetAvatarDto {
   @IsUrl(
-    { require_protocol: true, protocols: ['https'] },
-    { message: 'avatar phải là URL https' },
+    { require_protocol: true, protocols: ['http', 'https'] },
+    { message: 'avatar phải là URL http(s)' },
   )
   avatar!: string;
 

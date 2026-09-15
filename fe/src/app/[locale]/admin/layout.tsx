@@ -4,6 +4,7 @@ import { AccountShell } from '@/components/layout/account-shell';
 import { RequireAuth, useAuth } from '@/components/auth/auth-provider';
 import { useRouter } from '@/i18n/navigation';
 import { useEffect } from 'react';
+import { isAdmin } from '@/lib/onboarding';
 
 export default function AdminLayout({
   children,
@@ -14,10 +15,14 @@ export default function AdminLayout({
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && user && user.role !== 'ADMIN') {
+    if (!isLoading && user && !isAdmin(user)) {
       router.replace('/');
     }
   }, [isLoading, user, router]);
+
+  if (!isLoading && user && !isAdmin(user)) {
+    return null;
+  }
 
   return (
     <RequireAuth>

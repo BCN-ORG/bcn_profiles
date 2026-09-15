@@ -6,12 +6,27 @@ import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import { Button, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { identityService } from '@/services';
+import { PageShell } from '@/components/layout/page-shell';
+import {
+  SocialIconBadge,
+  type SocialProvider,
+} from '@/components/auth/social-icons';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
-const providers = [
-  { id: 'GOOGLE', name: 'Google', mark: 'G', color: '#4285f4' },
-  { id: 'GITHUB', name: 'GitHub', mark: 'GH', color: '#24292f' },
-  { id: 'DISCORD', name: 'Discord', mark: 'D', color: '#5865f2' },
-] as const;
+const providers: {
+  id: 'GOOGLE' | 'GITHUB' | 'DISCORD';
+  name: string;
+  icon: SocialProvider;
+}[] = [
+  { id: 'GOOGLE', name: 'Google', icon: 'google' },
+  { id: 'GITHUB', name: 'GitHub', icon: 'github' },
+  { id: 'DISCORD', name: 'Discord', icon: 'discord' },
+];
 
 function oauthErrorMessage(
   error: unknown,
@@ -72,20 +87,20 @@ export default function ConnectionsPage() {
   });
 
   return (
-    <div className="stack">
+    <PageShell>
       <PageHeader title={t('title')} description={t('subtitle')} />
-      <section className="provider-grid">
+      <div className="grid gap-4 md:grid-cols-2">
         {providers.map((provider) => {
-          const identity = query.data?.find((item) => item.provider === provider.id);
+          const identity = query.data?.find(
+            (item) => item.provider === provider.id,
+          );
           return (
-            <article className="provider-card" key={provider.id}>
-              <div className="provider-head">
-                <span className="provider-mark" style={{ background: provider.color }}>
-                  {provider.mark}
-                </span>
-                <div>
-                  <h3>{provider.name}</h3>
-                  <p className="muted">
+            <Card key={provider.id}>
+              <CardHeader className="flex-row items-start gap-3 space-y-0">
+                <SocialIconBadge provider={provider.icon} />
+                <div className="min-w-0 flex-1">
+                  <CardTitle>{provider.name}</CardTitle>
+                  <p className="text-sm text-muted-foreground">
                     {identity
                       ? identity.providerEmail ||
                         identity.providerUsername ||
@@ -93,56 +108,58 @@ export default function ConnectionsPage() {
                       : t('notLinked')}
                   </p>
                 </div>
-                <StatusBadge status={identity ? 'ACTIVE' : 'PENDING'} />
-              </div>
-              {identity ? (
-                <div className="actions">
+                <StatusBadge status={identity ? 'LINKED' : 'NOT_LINKED'} />
+              </CardHeader>
+              <CardContent>
+                {identity ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      disabled={sync.isPending}
+                      onClick={() => sync.mutate(provider.id)}
+                    >
+                      {tc('sync')}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      disabled={unlink.isPending}
+                      onClick={() => {
+                        if (confirm(`${tc('disconnect')} ${provider.name}?`)) {
+                          unlink.mutate(provider.id);
+                        }
+                      }}
+                    >
+                      {tc('disconnect')}
+                    </Button>
+                  </div>
+                ) : (
                   <Button
-                    variant="secondary"
-                    disabled={sync.isPending}
-                    onClick={() => sync.mutate(provider.id)}
+                    className="w-full"
+                    disabled={link.isPending}
+                    onClick={() => link.mutate(provider.id)}
                   >
-                    {tc('sync')}
+                    {tc('connect')}
                   </Button>
-                  <Button
-                    variant="danger"
-                    disabled={unlink.isPending}
-                    onClick={() => {
-                      if (confirm(`${tc('disconnect')} ${provider.name}?`)) {
-                        unlink.mutate(provider.id);
-                      }
-                    }}
-                  >
-                    {tc('disconnect')}
-                  </Button>
-                </div>
-              ) : (
-                <Button
-                  className="btn-wide"
-                  disabled={link.isPending}
-                  onClick={() => link.mutate(provider.id)}
-                >
-                  {tc('connect')}
-                </Button>
-              )}
-            </article>
+                )}
+              </CardContent>
+            </Card>
           );
         })}
-        <article className="provider-card">
-          <div className="provider-head">
-            <span className="provider-mark" style={{ background: '#0068ff' }}>
-              Z
-            </span>
-            <div>
-              <h3>Zalo</h3>
-              <p className="muted">{t('zaloSoon')}</p>
+        <Card>
+          <CardHeader className="flex-row items-start gap-3 space-y-0">
+            <SocialIconBadge provider="zalo" />
+            <div className="min-w-0 flex-1">
+              <CardTitle>Zalo</CardTitle>
+              <p className="text-sm text-muted-foreground">{t('zaloSoon')}</p>
             </div>
-          </div>
-          <Button className="btn-wide" variant="secondary" disabled>
-            {tc('comingSoon')}
-          </Button>
-        </article>
-      </section>
-    </div>
+          </CardHeader>
+          <CardContent>
+            <Button className="w-full" variant="secondary" disabled>
+              {tc('comingSoon')}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </PageShell>
   );
 }

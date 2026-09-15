@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   Delete,
   Query,
@@ -12,7 +13,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { IsArray, IsOptional, IsString, IsInt, Min } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,6 +30,7 @@ import { User } from '../auth/decorators/user.decorator';
 import { IdentitySessionService } from '../identity/session.service';
 import { OauthTokenService } from '../oauth/oauth-token.service';
 import { AuthorizationService } from './authorization.service';
+import { ApplicationsAdminService } from './applications-admin.service';
 
 class PermissionDto {
   @IsString() permission!: string;
@@ -54,10 +64,40 @@ class AuditQueryDto {
 
 type CurrentUser = { id: string };
 
+class CreateApplicationDto {
+  @IsString() code!: string;
+  @IsString() name!: string;
+  @IsString() clientId!: string;
+  @IsOptional() @IsBoolean() require2fa?: boolean;
+  @IsOptional() @IsString() redirectUri?: string;
+}
+
+class UpdateApplicationDto {
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() clientId?: string;
+  @IsOptional() @IsIn(['ACTIVE', 'DISABLED']) status?: 'ACTIVE' | 'DISABLED';
+  @IsOptional() @IsBoolean() require2fa?: boolean;
+}
+
+class RedirectUriDto {
+  @IsString() redirectUri!: string;
+}
+
+class RoleDto {
+  @IsString() code!: string;
+  @IsOptional() @IsString() name?: string;
+}
+
+class PermissionDtoBody {
+  @IsString() code!: string;
+  @IsOptional() @IsString() description?: string;
+}
+
 @Controller()
 export class AuthorizationController {
   constructor(
     private readonly authorization: AuthorizationService,
+    private readonly appsAdmin: ApplicationsAdminService,
     private readonly tokens: OauthTokenService,
     private readonly sessions: IdentitySessionService,
   ) {}
@@ -96,6 +136,128 @@ export class AuthorizationController {
     return response.json(
       await this.checkPermissions(header, dto.permissions, 'all'),
     );
+  }
+
+  @Public()
+  @Post('internal/session/check')
+  async sessionCheck(
+    @Headers('authorization') header: string | undefined,
+    @Res() response: Response,
+  ) {
+    const token = header?.match(/^Bearer (\S+)$/i)?.[1];
+    if (!token) {
+      return response.json({ active: false, reason: 'TOKEN_INVALID' });
+    }
+    try {
+      const payload = this.tokens.validate(token);
+      const session = await this.sessions.getAppSession(payload.sid);
+      const active =
+        Boolean(session) &&
+        session!.userId === payload.sub &&
+        session!.application === payload.aud;
+      return response.json(
+        active
+          ? { active: true, sub: payload.sub, aud: payload.aud, sid: payload.sid }
+          : { active: false, reason: 'SESSION_REVOKED' },
+      );
+    } catch {
+      return response.json({ active: false, reason: 'TOKEN_INVALID' });
+    }
+  }
+
+  @Get('admin/applications')
+  @Roles(Role.ADMIN)
+  listApplications() {
+    return this.appsAdmin.listApplications();
+  }
+
+  @Get('admin/applications/:app')
+  @Roles(Role.ADMIN)
+  getApplication(@Param('app') app: string) {
+    return this.appsAdmin.getApplication(app);
+  }
+
+  @Post('admin/applications')
+  @Roles(Role.ADMIN)
+  createApplication(@Body() dto: CreateApplicationDto) {
+    return this.appsAdmin.createApplication(dto);
+  }
+
+  @Patch('admin/applications/:app')
+  @Roles(Role.ADMIN)
+  updateApplication(
+    @Param('app') app: string,
+    @Body() dto: UpdateApplicationDto,
+  ) {
+    return this.appsAdmin.updateApplication(app, dto);
+  }
+
+  @Post('admin/applications/:app/redirect-uris')
+  @Roles(Role.ADMIN)
+  addRedirectUri(@Param('app') app: string, @Body() dto: RedirectUriDto) {
+    return this.appsAdmin.addRedirectUri(app, dto.redirectUri);
+  }
+
+  @Delete('admin/applications/:app/redirect-uris')
+  @Roles(Role.ADMIN)
+  removeRedirectUri(@Param('app') app: string, @Body() dto: RedirectUriDto) {
+    return this.appsAdmin.removeRedirectUri(app, dto.redirectUri);
+  }
+
+  @Post('admin/applications/:app/roles')
+  @Roles(Role.ADMIN)
+  createRole(@Param('app') app: string, @Body() dto: RoleDto) {
+    return this.appsAdmin.createRole(app, dto);
+  }
+
+  @Delete('admin/applications/:app/roles/:role')
+  @Roles(Role.ADMIN)
+  deleteRole(@Param('app') app: string, @Param('role') role: string) {
+    return this.appsAdmin.deleteRole(app, role);
+  }
+
+  @Post('admin/applications/:app/permissions')
+  @Roles(Role.ADMIN)
+  createPermission(
+    @Param('app') app: string,
+    @Body() dto: PermissionDtoBody,
+  ) {
+    return this.appsAdmin.createPermission(app, dto);
+  }
+
+  @Delete('admin/applications/:app/permissions/:permission')
+  @Roles(Role.ADMIN)
+  deletePermission(
+    @Param('app') app: string,
+    @Param('permission') permission: string,
+  ) {
+    return this.appsAdmin.deletePermission(app, permission);
+  }
+
+  @Post('admin/applications/:app/roles/:role/permissions/:permission')
+  @Roles(Role.ADMIN)
+  grantRolePermission(
+    @Param('app') app: string,
+    @Param('role') role: string,
+    @Param('permission') permission: string,
+  ) {
+    return this.appsAdmin.grantPermissionToRole(app, role, permission);
+  }
+
+  @Delete('admin/applications/:app/roles/:role/permissions/:permission')
+  @Roles(Role.ADMIN)
+  revokeRolePermission(
+    @Param('app') app: string,
+    @Param('role') role: string,
+    @Param('permission') permission: string,
+  ) {
+    return this.appsAdmin.revokePermissionFromRole(app, role, permission);
+  }
+
+  @Get('admin/applications/:app/users')
+  @Roles(Role.ADMIN)
+  listAppUsers(@Param('app') app: string) {
+    return this.appsAdmin.listAppUsers(app);
   }
 
   @Get('me/applications')

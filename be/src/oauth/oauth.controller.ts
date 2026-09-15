@@ -7,7 +7,6 @@ import {
   Query,
   Req,
   Res,
-  UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
@@ -23,6 +22,32 @@ export class OauthController {
     private readonly sessions: IdentitySessionService,
     private readonly tokens: OauthTokenService,
   ) {}
+
+  private issuer(): string {
+    return (
+      process.env.OAUTH_ISSUER?.trim() ||
+      process.env.APP_URL?.trim() ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
+  }
+
+  @Public()
+  @Get('.well-known/openid-configuration')
+  openIdConfiguration(@Res() response: Response) {
+    const issuer = this.issuer();
+    return response.json({
+      issuer,
+      authorization_endpoint: `${issuer}/oauth/authorize`,
+      token_endpoint: `${issuer}/oauth/token`,
+      revocation_endpoint: `${issuer}/oauth/revoke`,
+      jwks_uri: `${issuer}/.well-known/jwks.json`,
+      userinfo_endpoint: `${issuer}/api/me`,
+      response_types_supported: ['code'],
+      grant_types_supported: ['authorization_code', 'refresh_token'],
+      code_challenge_methods_supported: ['S256'],
+      token_endpoint_auth_methods_supported: ['none'],
+    });
+  }
 
   @Public()
   @Get('.well-known/jwks.json')
@@ -41,10 +66,13 @@ export class OauthController {
       request.cookies?.bcn_sso as string | undefined,
     );
     if (!session) {
-      throw new UnauthorizedException({
-        code: 'AUTH_REQUIRED',
-        message: 'BCN SSO login is required',
-      });
+      const fe = (
+        process.env.FRONTEND_URL?.trim() || 'http://localhost:5173'
+      ).replace(/\/$/, '');
+      const returnUrl = `${request.protocol}://${request.get('host')}${request.originalUrl}`;
+      const loginUrl = new URL(`${fe}/login`);
+      loginUrl.searchParams.set('oauth_return', returnUrl);
+      return response.redirect(302, loginUrl.toString());
     }
     const result = await this.oauth.authorize(query, session);
     const url = new URL(result.redirectUri);

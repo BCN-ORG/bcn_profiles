@@ -6,18 +6,22 @@ import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { authService } from '@/services';
 import type { User } from '@/types';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
-import { needsOnboarding } from '@/lib/onboarding';
+import { needsOnboarding, isOnboardingExemptPath } from '@/lib/onboarding';
+import { Button, Skeleton } from '@/components/ui/primitives';
+import { cn } from '@/lib/utils';
 
 const AuthContext = createContext<{
   user: User | null | undefined;
   isLoading: boolean;
   refresh: () => Promise<unknown>;
   setUser: (user: User | null) => void;
+  signOut: () => Promise<void>;
 }>({
   user: undefined,
   isLoading: true,
   refresh: async () => undefined,
   setUser: () => undefined,
+  signOut: async () => undefined,
 });
 
 export function useAuth() {
@@ -32,6 +36,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: false,
   });
 
+  async function signOut() {
+    try {
+      await authService.logout();
+    } catch {
+      // Clear local session even when the API call fails (network, expired cookie).
+    }
+    queryClient.setQueryData(['me'], null);
+    queryClient.removeQueries({
+      predicate: (q) => q.queryKey[0] === 'me',
+    });
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -39,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading: query.isLoading,
         refresh: query.refetch,
         setUser: (user) => queryClient.setQueryData(['me'], user),
+        signOut,
       }}
     >
       {children}
@@ -60,28 +77,27 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isLoading || !user) return;
-    const onWelcome = pathname.startsWith('/welcome');
-    if (needsOnboarding(user) && !onWelcome) {
+    if (needsOnboarding(user) && !isOnboardingExemptPath(pathname)) {
       router.replace('/welcome');
     }
   }, [isLoading, user, pathname, router]);
 
   if (isLoading) {
     return (
-      <main className="center-screen">
-        <div className="loader" />
-        <p>{t('loading')}</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Skeleton className="size-8 rounded-full" />
+        <p className="text-sm text-muted-foreground">{t('loading')}</p>
       </main>
     );
   }
 
   if (!user) return null;
 
-  if (needsOnboarding(user) && !pathname.startsWith('/welcome')) {
+  if (needsOnboarding(user) && !isOnboardingExemptPath(pathname)) {
     return (
-      <main className="center-screen">
-        <div className="loader" />
-        <p>{t('loading')}</p>
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Skeleton className="size-8 rounded-full" />
+        <p className="text-sm text-muted-foreground">{t('loading')}</p>
       </main>
     );
   }
@@ -94,16 +110,22 @@ export function LocaleSwitcher() {
   const pathname = usePathname();
 
   return (
-    <div className="locale-switch">
+    <div className="inline-flex items-center gap-0.5">
       {(['vi', 'en'] as const).map((item) => (
-        <Link
+        <Button
           key={item}
-          href={pathname}
-          locale={item}
-          className={locale === item ? 'active' : ''}
+          asChild
+          variant={locale === item ? 'secondary' : 'ghost'}
+          size="sm"
+          className={cn(
+            'h-7 rounded-full px-2.5 text-[11px] font-semibold tracking-wide',
+            locale === item && 'bg-primary/10 text-primary hover:bg-primary/15',
+          )}
         >
-          {item.toUpperCase()}
-        </Link>
+          <Link href={pathname} locale={item}>
+            {item.toUpperCase()}
+          </Link>
+        </Button>
       ))}
     </div>
   );

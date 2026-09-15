@@ -1,8 +1,6 @@
-import { clsx, type ClassValue } from 'clsx';
+import { cn } from 'cn';
 
-export function cn(...inputs: ClassValue[]) {
-  return clsx(inputs);
-}
+export { cn };
 
 export function initials(name?: string) {
   return (name || 'BCN')

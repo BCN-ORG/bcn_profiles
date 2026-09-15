@@ -46,6 +46,8 @@ import {
   Disable2FADto,
 } from './dto/enable-two-factor.dto';
 import { IdentitySessionService } from '../identity/session.service';
+import { resolveCookieDomain } from '../common/cookies/cookie-domain';
+import { clearSsoCookie, setSsoCookie } from '../common/cookies/sso-cookie';
 
 @Controller('auth')
 export class AuthController {
@@ -53,33 +55,9 @@ export class AuthController {
 
   private readonly isProduction = process.env.NODE_ENV === 'production';
 
-  /**
-   * Cookie Domain must be a suffix of the API host. Pick parent domain from the
-   * request host so both *.uside.studio and *.uside.id.vn work.
-   */
-  private resolveCookieDomain(req: Request): string | undefined {
-    const forwarded = String(req.headers['x-forwarded-host'] ?? '')
-      .split(',')[0]
-      .trim()
-      .toLowerCase();
-    const host = (forwarded || String(req.headers.host ?? ''))
-      .toLowerCase()
-      .split(':')[0];
-
-    if (host === 'uside.id.vn' || host.endsWith('.uside.id.vn')) {
-      return '.uside.id.vn';
-    }
-    if (host === 'uside.studio' || host.endsWith('.uside.studio')) {
-      return '.uside.studio';
-    }
-
-    // Generic host (e.g. herokuapp.com): omit Domain so the cookie is host-only.
-    return undefined;
-  }
-
   private baseCookieOptions(req: Request): CookieOptions {
     if (this.isProduction) {
-      const domain = this.resolveCookieDomain(req);
+      const domain = resolveCookieDomain(req);
       return {
         httpOnly: true,
         secure: true,
@@ -111,17 +89,6 @@ export class AuthController {
       ...this.baseCookieOptions(req),
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
-  }
-
-  private setSsoCookie(response: Response, sid?: string): void {
-    if (!sid) return;
-    response.cookie('bcn_sso', sid, {
-      httpOnly: true,
-      secure: this.isProduction,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60 * 1000,
-    });
   }
 
   constructor(
@@ -185,7 +152,7 @@ export class AuthController {
         tokens.refresh_token,
         this.refreshTokenCookieOptions(response.req),
       );
-      this.setSsoCookie(response, tokens.sso_session_id);
+      setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
       return {
         message: 'Đăng nhập thành công (2FA không bắt buộc)',
@@ -228,7 +195,7 @@ export class AuthController {
 
     response.clearCookie('access_token', this.baseCookieOptions(response.req));
     response.clearCookie('refresh_token', this.baseCookieOptions(response.req));
-    response.clearCookie('bcn_sso', { path: '/' });
+    clearSsoCookie(response, response.req as Request);
 
     return {
       message: 'Đăng xuất thành công',
@@ -425,7 +392,7 @@ export class AuthController {
       tokens.refresh_token,
       this.refreshTokenCookieOptions(response.req),
     );
-    this.setSsoCookie(response, tokens.sso_session_id);
+    setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
     return {
       success: true,
@@ -507,7 +474,7 @@ export class AuthController {
       tokens.refresh_token,
       this.refreshTokenCookieOptions(response.req),
     );
-    this.setSsoCookie(response, tokens.sso_session_id);
+    setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
     return {
       success: true,
@@ -580,7 +547,7 @@ export class AuthController {
       tokens.refresh_token,
       this.refreshTokenCookieOptions(response.req),
     );
-    this.setSsoCookie(response, tokens.sso_session_id);
+    setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
     return {
       success: true,
@@ -651,7 +618,7 @@ export class AuthController {
       tokens.refresh_token,
       this.refreshTokenCookieOptions(response.req),
     );
-    this.setSsoCookie(response, tokens.sso_session_id);
+    setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
     return {
       success: true,

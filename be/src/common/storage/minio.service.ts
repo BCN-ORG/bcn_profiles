@@ -3,12 +3,13 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  OnModuleInit,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'minio';
 
 @Injectable()
-export class MinioService {
+export class MinioService implements OnModuleInit {
   private readonly logger = new Logger(MinioService.name);
   private readonly bucket = process.env.MINIO_BUCKET || '';
   private readonly publicEndpoint = process.env.MINIO_ENDPOINT || '';
@@ -68,6 +69,51 @@ export class MinioService {
       });
     };
     this.client = create(endpoint);
+  }
+
+  async onModuleInit(): Promise<void> {
+    if (!this.client) return;
+    try {
+      await this.ensureBucketReady();
+    } catch (error) {
+      this.logger.error(
+        'MinIO bucket setup failed; avatar upload may be unavailable',
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  private async ensureBucketReady(): Promise<void> {
+    const client = this.ensureConfigured();
+    const exists = await client.bucketExists(this.bucket);
+    if (!exists) {
+      await client.makeBucket(
+        this.bucket,
+        process.env.MINIO_REGION || 'us-east-1',
+      );
+      this.logger.log(`Created MinIO bucket "${this.bucket}"`);
+    }
+    await this.ensureAvatarPublicReadPolicy(client);
+  }
+
+  private async ensureAvatarPublicReadPolicy(client: Client): Promise<void> {
+    const folder =
+      (process.env.MINIO_AVATAR_FOLDER ?? 'user-avatars').replace(
+        /^\/+|\/+$/g,
+        '',
+      ) || 'user-avatars';
+    const policy = {
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Principal: { AWS: ['*'] },
+          Action: ['s3:GetObject'],
+          Resource: [`arn:aws:s3:::${this.bucket}/${folder}/*`],
+        },
+      ],
+    };
+    await client.setBucketPolicy(this.bucket, JSON.stringify(policy));
   }
 
   private ensureConfigured(): Client {

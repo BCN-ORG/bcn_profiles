@@ -4,11 +4,19 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
+import { Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import { Button, StatusBadge } from '@/components/ui/primitives';
 import { identityService } from '@/services';
 import { useRouter } from '@/i18n/navigation';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 const OPTIONAL = [
   { id: 'GOOGLE', label: 'Google' },
@@ -63,50 +71,66 @@ export default function WelcomeOptionalPage() {
   }
 
   return (
-    <section className="onboarding-stage">
-      <span className="eyebrow">{t('step', { current: 2, total: 3 })}</span>
-      <h1>{t('optionalTitle')}</h1>
-      <p className="onboarding-lead">{t('optionalBody')}</p>
-
-      <div className="onboarding-provider-list">
-        {OPTIONAL.map((provider) => {
-          const linked = identities.data?.some(
-            (item) => item.provider === provider.id,
-          );
-          return (
-            <div key={provider.id} className="onboarding-card provider-row">
-              <div>
-                <strong>{provider.label}</strong>
-                <StatusBadge status={linked ? 'VERIFIED' : 'UNKNOWN'} />
+    <Card className="auth-panel overflow-hidden border-0 shadow-none">
+      <CardHeader className="space-y-3">
+        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          <Link2 className="size-3.5" aria-hidden />
+          {t('optionalTitle')}
+        </span>
+        <CardTitle className="text-xl font-semibold">{t('optionalTitle')}</CardTitle>
+        <CardDescription className="text-base leading-relaxed">
+          {t('optionalBody')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-3">
+          {OPTIONAL.map((provider) => {
+            const linked = identities.data?.some(
+              (item) => item.provider === provider.id,
+            );
+            return (
+              <div
+                key={provider.id}
+                className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 bg-background/50 p-4"
+              >
+                <div className="flex items-center gap-3">
+                  <strong className="text-sm">{provider.label}</strong>
+                  <StatusBadge status={linked ? 'LINKED' : 'NOT_LINKED'} />
+                </div>
+                {linked ? (
+                  <span className="text-sm text-muted-foreground">
+                    {t('linked')}
+                  </span>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    disabled={busy === provider.id}
+                    onClick={() => void connect(provider.id, provider.label)}
+                  >
+                    {tc('connect')}
+                  </Button>
+                )}
               </div>
-              {linked ? (
-                <span className="muted">{t('linked')}</span>
-              ) : (
-                <Button
-                  variant="secondary"
-                  disabled={busy === provider.id}
-                  onClick={() => void connect(provider.id, provider.label)}
-                >
-                  {tc('connect')}
-                </Button>
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      <div className="onboarding-actions">
-        <Button className="btn-wide" onClick={() => router.push('/welcome/ready')}>
-          {t('skipOptional')}
-        </Button>
-        <Button
-          variant="ghost"
-          className="btn-wide"
-          onClick={() => router.push('/welcome/discord')}
-        >
-          {tc('back')}
-        </Button>
-      </div>
-    </section>
+        <div className="flex flex-col gap-2">
+          <Button
+            className="h-11 w-full font-semibold"
+            onClick={() => router.push('/welcome/ready')}
+          >
+            {t('skipOptional')}
+          </Button>
+          <Button
+            variant="ghost"
+            className="w-full"
+            onClick={() => router.push('/welcome/discord')}
+          >
+            {tc('back')}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

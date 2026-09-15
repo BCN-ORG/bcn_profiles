@@ -3,13 +3,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
+import { useStatusLabel } from '@/hooks/use-status-label';
 import { Button, EmptyState, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { formatDate } from '@/lib/utils';
 import { sessionService } from '@/services';
+import { Card, CardContent } from '@/components/ui/card';
+import { PageShell } from '@/components/layout/page-shell';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function SessionsPage() {
   const t = useTranslations('sessions');
   const tc = useTranslations('common');
+  const label = useStatusLabel();
   const locale = useLocale();
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -38,7 +50,7 @@ export default function SessionsPage() {
   });
 
   return (
-    <div className="stack">
+    <PageShell>
       <PageHeader
         title={t('title')}
         description={t('subtitle')}
@@ -55,46 +67,50 @@ export default function SessionsPage() {
       {!query.isLoading && (!query.data || query.data.length === 0) ? (
         <EmptyState title={t('empty')} />
       ) : (
-        <section className="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>App</th>
-                <th>Created</th>
-                <th>Expires</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {query.data?.map((session) => (
-                <tr key={session.id}>
-                  <td>
-                    {session.type}{' '}
-                    {session.current ? <StatusBadge status={t('current')} /> : null}
-                  </td>
-                  <td>{session.application || '—'}</td>
-                  <td>{formatDate(session.createdAt, locale)}</td>
-                  <td>{formatDate(session.expiresAt, locale)}</td>
-                  <td>
-                    {!session.current ? (
-                      <Button
-                        variant="danger"
-                        disabled={revoke.isPending}
-                        onClick={() => {
-                          if (confirm(tc('confirm'))) revoke.mutate(session.id);
-                        }}
-                      >
-                        {tc('revoke')}
-                      </Button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+        <Card>
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('type')}</TableHead>
+                  <TableHead>{t('app')}</TableHead>
+                  <TableHead>{t('created')}</TableHead>
+                  <TableHead>{t('expires')}</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {query.data?.map((session) => (
+                  <TableRow key={session.id}>
+                    <TableCell>
+                      {label(session.type)}{' '}
+                      {session.current ? (
+                        <StatusBadge status="CURRENT" />
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{session.application || '—'}</TableCell>
+                    <TableCell>{formatDate(session.createdAt, locale)}</TableCell>
+                    <TableCell>{formatDate(session.expiresAt, locale)}</TableCell>
+                    <TableCell>
+                      {!session.current ? (
+                        <Button
+                          variant="danger"
+                          disabled={revoke.isPending}
+                          onClick={() => {
+                            if (confirm(tc('confirm'))) revoke.mutate(session.id);
+                          }}
+                        >
+                          {tc('revoke')}
+                        </Button>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
-    </div>
+    </PageShell>
   );
 }

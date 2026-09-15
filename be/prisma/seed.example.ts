@@ -176,6 +176,35 @@ async function main() {
         'event.participant.export',
       ],
     },
+    {
+      id: 'app-judge',
+      code: 'JUDGE',
+      name: 'BCN Judge',
+      clientId: 'bcn-judge',
+      redirectUri:
+        process.env.JUDGE_REDIRECT_URI ??
+        'https://judge.bcn.id.vn/auth/callback',
+      permissions: [
+        'judge.problem.read',
+        'judge.problem.create',
+        'judge.submission.read',
+        'judge.submission.review',
+      ],
+    },
+    {
+      id: 'app-attendance',
+      code: 'ATTENDANCE',
+      name: 'BCN Attendance',
+      clientId: 'bcn-attendance',
+      redirectUri:
+        process.env.ATTENDANCE_REDIRECT_URI ??
+        'https://attendance.bcn.id.vn/auth/callback',
+      permissions: [
+        'attendance.session.read',
+        'attendance.checkin.execute',
+        'attendance.report.read',
+      ],
+    },
   ];
 
   for (const app of applications) {
