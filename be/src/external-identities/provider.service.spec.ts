@@ -15,7 +15,9 @@ describe('ExternalProviderService', () => {
     };
     const service = new ExternalProviderService(config as ConfigService);
     const verifier = 'a'.repeat(21) + 'A'.repeat(11) + '1'.repeat(11);
-    const url = new URL(service.authorizationUrl('ZALO', 'csrf-state', verifier));
+    const url = new URL(
+      service.authorizationUrl('ZALO', 'csrf-state', verifier),
+    );
     expect(url.origin + url.pathname).toBe(
       'https://oauth.zaloapp.com/v4/permission',
     );

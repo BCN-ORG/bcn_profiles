@@ -25,9 +25,7 @@ describe('ExternalIdentitiesService', () => {
       },
     };
     const providers = {
-      authorizationUrl: jest.fn(
-        (_provider: string, state: string, _verifier?: string) => state,
-      ),
+      authorizationUrl: jest.fn((_provider: string, state: string) => state),
       exchange: jest.fn().mockResolvedValue({ access_token: 'provider-token' }),
       identity: jest.fn().mockResolvedValue({
         provider: 'GOOGLE',
