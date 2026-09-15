@@ -64,7 +64,31 @@ export default function LoginPage() {
       );
     } else if (oauth === 'cancelled' || oauth === 'incomplete') {
       toast.message(t('oauthCancelled'));
+    } else if (oauth === 'failed') {
+      toast.error(t('oauthFailed'));
+    } else if (oauth === 'blocked') {
+      toast.error(t('oauthBlocked'));
     }
+  }, [search, t]);
+
+  useEffect(() => {
+    const oauth = search.get('oauth');
+    const token = search.get('token');
+    if (!token) return;
+    if (oauth === '2fa_verify') {
+      setStep({ kind: 'verify', token, method: 'totp' });
+      toast.message(t('oauthNeeds2fa'));
+    } else if (oauth === '2fa_setup') {
+      setStep({ kind: 'setup', token });
+      toast.message(t('oauthNeeds2faSetup'));
+    } else {
+      return;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('token');
+    url.searchParams.delete('oauth');
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, '', next);
   }, [search, t]);
 
   async function goAfterAuth(fromLogin?: User) {
@@ -280,6 +304,21 @@ export default function LoginPage() {
               />
             </div>
           </>
+        ) : null}
+
+        {step.kind === 'setup' && !step.qrCode ? (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">{t('password')}</Label>
+            <Input
+              type="password"
+              autoComplete="current-password"
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">{t('setupPasswordHint')}</p>
+          </div>
         ) : null}
 
         {step.kind === 'setup' && step.qrCode ? (

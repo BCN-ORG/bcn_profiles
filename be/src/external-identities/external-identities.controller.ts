@@ -90,12 +90,16 @@ export class ExternalIdentitiesController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const frontend = this.frontendUrl();
+    const frontend = this.frontendUrl(request);
+    const redirectBrowser = (location: string) => {
+      response.redirect(location);
+    };
+
     if (oauthError || !state || !code) {
       const reason =
         oauthError === 'access_denied' ? 'cancelled' : 'incomplete';
       if (frontend) {
-        response.redirect(this.oauthFrontendPath(provider, reason));
+        redirectBrowser(this.oauthFrontendPath(provider, reason, 'login'));
         return;
       }
       throw new UnauthorizedException({
@@ -108,14 +112,26 @@ export class ExternalIdentitiesController {
       const result = await this.identities.callback(provider, state, code);
       if (result.flow === 'link') {
         if (frontend) {
-          response.redirect(this.oauthFrontendPath(provider, 'linked'));
+          redirectBrowser(this.oauthFrontendPath(provider, 'linked', 'link'));
           return;
         }
         return { identity: result.identity, membership: result.membership };
       }
 
       const login = await this.auth.login(result.user);
-      if (!login.skipTwoFactor) return login;
+      if (!login.skipTwoFactor) {
+        if (frontend) {
+          const params = new URLSearchParams({
+            provider: provider.toLowerCase(),
+            oauth: login.requiresTwoFactorSetup ? '2fa_setup' : '2fa_verify',
+          });
+          const token = login.setupToken || login.verificationToken;
+          if (token) params.set('token', token);
+          redirectBrowser(`${frontend}/login?${params.toString()}`);
+          return;
+        }
+        return login;
+      }
       const tokens = await this.auth.generateTokensAfterTwoFactorVerification(
         result.user.id,
       );
@@ -138,45 +154,59 @@ export class ExternalIdentitiesController {
         setSsoCookie(response, request, tokens.sso_session_id);
       }
       if (frontend) {
-        response.redirect(frontend);
+        redirectBrowser(frontend);
         return;
       }
       return { user: tokens.user };
     } catch (error) {
       if (frontend) {
-        const code =
-          error &&
-          typeof error === 'object' &&
-          'getResponse' in error &&
-          typeof (error as { getResponse: () => unknown }).getResponse ===
-            'function'
-            ? (
-                (error as { getResponse: () => unknown }).getResponse() as {
-                  code?: string;
-                }
-              )?.code
-            : undefined;
-        response.redirect(
-          this.oauthFrontendPath(
-            provider,
-            code === 'IDENTITY_NOT_LINKED' ? 'not_linked' : 'failed',
-          ),
-        );
+        const errorCode = this.oauthErrorCode(error);
+        const status =
+          errorCode === 'IDENTITY_NOT_LINKED'
+            ? 'not_linked'
+            : errorCode === 'ACCOUNT_BLOCKED'
+              ? 'blocked'
+              : 'failed';
+        const flow: 'login' | 'link' =
+          errorCode === 'IDENTITY_ALREADY_LINKED' ? 'link' : 'login';
+        redirectBrowser(this.oauthFrontendPath(provider, status, flow));
         return;
       }
       throw error;
     }
   }
 
-  private oauthFrontendPath(provider: string, status: string): string {
+  private oauthErrorCode(error: unknown): string | undefined {
+    if (
+      !error ||
+      typeof error !== 'object' ||
+      !('getResponse' in error) ||
+      typeof (error as { getResponse: () => unknown }).getResponse !==
+        'function'
+    ) {
+      return undefined;
+    }
+    const body = (error as { getResponse: () => unknown }).getResponse() as {
+      code?: string;
+    };
+    return body?.code;
+  }
+
+  private oauthFrontendPath(
+    provider: string,
+    status: string,
+    flow: 'login' | 'link',
+  ): string {
     const frontend = this.frontendUrl()!;
-    const step = provider.toLowerCase() === 'discord' ? 'discord' : 'optional';
-    const path =
-      status === 'linked' || status === 'cancelled' || status === 'incomplete'
-        ? `/welcome/${step}`
-        : status === 'not_linked'
-          ? '/login'
-          : `/welcome/${step}`;
+    const welcomeStep =
+      provider.toLowerCase() === 'discord' ? 'discord' : 'optional';
+    const useWelcome =
+      flow === 'link' &&
+      (status === 'linked' ||
+        status === 'cancelled' ||
+        status === 'incomplete' ||
+        status === 'failed');
+    const path = useWelcome ? `/welcome/${welcomeStep}` : '/login';
     const params = new URLSearchParams({
       provider: provider.toLowerCase(),
       oauth: status,
@@ -184,12 +214,25 @@ export class ExternalIdentitiesController {
     return `${frontend}${path}?${params.toString()}`;
   }
 
-  private frontendUrl(): string | undefined {
-    const value = process.env.FRONTEND_URL?.trim();
-    if (!value) return undefined;
-    const url = new URL(value);
-    if (!['http:', 'https:'].includes(url.protocol)) return undefined;
-    return url.origin;
+  private frontendUrl(request?: Request): string | undefined {
+    for (const raw of [
+      process.env.FRONTEND_URL?.trim(),
+      process.env.APP_URL?.trim(),
+    ]) {
+      if (!raw) continue;
+      try {
+        const url = new URL(raw);
+        if (['http:', 'https:'].includes(url.protocol)) return url.origin;
+      } catch {
+        /* ignore invalid */
+      }
+    }
+    if (!request) return undefined;
+    const host = request.get('x-forwarded-host') || request.get('host');
+    if (!host) return undefined;
+    const proto =
+      request.get('x-forwarded-proto') || request.protocol || 'https';
+    return `${proto}://${host}`;
   }
 
   private async assertRecentAuthentication(userId: string, request: Request) {
