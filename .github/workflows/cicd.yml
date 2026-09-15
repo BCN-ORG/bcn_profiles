@@ -92,7 +92,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: pnpm
+          # pnpm cache post-step fails path validation on this runner; install is fast enough without it
           cache-dependency-path: fe/pnpm-lock.yaml
 
       - name: Install dependencies
@@ -105,6 +105,8 @@ jobs:
 
       - name: Build
         working-directory: fe
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://profiles.bcn.id.vn/api' }}
         run: pnpm build
 
       - name: Audit production dependencies
