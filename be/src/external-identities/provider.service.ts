@@ -144,12 +144,13 @@ export class ExternalProviderService {
         scope: '',
       },
     };
-    const clientId = this.config.get<string>(`${provider}_CLIENT_ID`)?.trim();
+    const envPrefix = provider === 'GITHUB' ? 'OAUTH_GITHUB' : provider;
+    const clientId = this.config.get<string>(`${envPrefix}_CLIENT_ID`)?.trim();
     const clientSecret = this.config
-      .get<string>(`${provider}_CLIENT_SECRET`)
+      .get<string>(`${envPrefix}_CLIENT_SECRET`)
       ?.trim();
     const redirectUri = this.config
-      .get<string>(`${provider}_REDIRECT_URI`)
+      .get<string>(`${envPrefix}_REDIRECT_URI`)
       ?.trim();
     if (!clientId || !clientSecret || !redirectUri) {
       throw new BadGatewayException({
