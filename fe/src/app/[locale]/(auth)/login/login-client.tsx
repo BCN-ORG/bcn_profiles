@@ -16,6 +16,11 @@ import {
 import { Button } from '@/components/ui/primitives';
 import { useRouter } from '@/i18n/navigation';
 import { needsOnboarding } from '@/lib/onboarding';
+import {
+  clearAuthStep,
+  readAuthStep,
+  writeAuthStep,
+} from '@/lib/auth-step';
 import type { User } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +32,10 @@ type AuthStep =
   | { kind: 'login' }
   | { kind: 'verify'; token: string; method: 'totp' | 'email' | 'backup-code' }
   | { kind: 'setup'; token: string; secret?: string; qrCode?: string };
+
+function initialAuthStep(): AuthStep {
+  return readAuthStep() ?? { kind: 'login' };
+}
 
 export default function LoginPage() {
   const t = useTranslations('login');
@@ -41,13 +50,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState('');
-  const [step, setStep] = useState<AuthStep>({ kind: 'login' });
+  const [step, setStepState] = useState<AuthStep>({ kind: 'login' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
 
+  function setStep(nextStep: AuthStep) {
+    setStepState(nextStep);
+    if (nextStep.kind === 'login') clearAuthStep();
+    else writeAuthStep(nextStep);
+  }
+
+  useEffect(() => {
+    const stored = initialAuthStep();
+    if (stored.kind !== 'login') setStepState(stored);
+  }, []);
+
   useEffect(() => {
     if (!isLoading && user) {
+      clearAuthStep();
       if (oauthReturn) {
         window.location.assign(oauthReturn);
         return;
@@ -87,11 +108,12 @@ export default function LoginPage() {
     const url = new URL(window.location.href);
     url.searchParams.delete('token');
     url.searchParams.delete('oauth');
-    const next = `${url.pathname}${url.search}${url.hash}`;
-    window.history.replaceState({}, '', next);
+    const cleaned = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, '', cleaned);
   }, [search, t]);
 
   async function goAfterAuth(fromLogin?: User) {
+    clearAuthStep();
     if (fromLogin) setUser(fromLogin);
     const result = await refresh();
     const me =

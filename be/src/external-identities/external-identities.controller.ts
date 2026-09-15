@@ -21,6 +21,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ExternalIdentitiesService } from './external-identities.service';
 import { LoginDto } from '../auth/dto/login.dto';
 import { setSsoCookie } from '../common/cookies/sso-cookie';
+import { setAuthCookies } from '../common/cookies/auth-cookies';
 
 type CurrentUser = { id: string };
 
@@ -135,21 +136,7 @@ export class ExternalIdentitiesController {
       const tokens = await this.auth.generateTokensAfterTwoFactorVerification(
         result.user.id,
       );
-      const production = process.env.NODE_ENV === 'production';
-      response.cookie('access_token', tokens.access_token, {
-        httpOnly: true,
-        secure: production,
-        sameSite: production ? 'none' : 'lax',
-        path: '/',
-        maxAge: 60 * 60 * 1000,
-      });
-      response.cookie('refresh_token', tokens.refresh_token, {
-        httpOnly: true,
-        secure: production,
-        sameSite: production ? 'none' : 'lax',
-        path: '/',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      setAuthCookies(response, request, tokens);
       if (tokens.sso_session_id) {
         setSsoCookie(response, request, tokens.sso_session_id);
       }

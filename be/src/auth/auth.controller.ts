@@ -15,7 +15,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import type { CookieOptions, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from '@nestjs/passport';
 import { User } from './decorators/user.decorator';
@@ -46,50 +46,16 @@ import {
   Disable2FADto,
 } from './dto/enable-two-factor.dto';
 import { IdentitySessionService } from '../identity/session.service';
-import { resolveCookieDomain } from '../common/cookies/cookie-domain';
 import { clearSsoCookie, setSsoCookie } from '../common/cookies/sso-cookie';
+import {
+  accessTokenCookieOptions,
+  clearAuthCookies,
+  refreshTokenCookieOptions,
+} from '../common/cookies/auth-cookies';
 
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
-
-  private readonly isProduction = process.env.NODE_ENV === 'production';
-
-  private baseCookieOptions(req: Request): CookieOptions {
-    if (this.isProduction) {
-      const domain = resolveCookieDomain(req);
-      return {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        ...(domain ? { domain } : {}),
-        path: '/',
-      };
-    }
-
-    // Development: FE/API share http://localhost (different ports = same-site).
-    // SameSite=None without Secure is rejected by Chrome, so cookies never stick.
-    return {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      path: '/',
-    };
-  }
-
-  private accessTokenCookieOptions(req: Request): CookieOptions {
-    return {
-      ...this.baseCookieOptions(req),
-      maxAge: 60 * 60 * 1000,
-    };
-  }
-
-  private refreshTokenCookieOptions(req: Request): CookieOptions {
-    return {
-      ...this.baseCookieOptions(req),
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    };
-  }
 
   constructor(
     private readonly authService: AuthService,
@@ -145,12 +111,12 @@ export class AuthController {
       response.cookie(
         'access_token',
         tokens.access_token,
-        this.accessTokenCookieOptions(response.req),
+        accessTokenCookieOptions(response.req),
       );
       response.cookie(
         'refresh_token',
         tokens.refresh_token,
-        this.refreshTokenCookieOptions(response.req),
+        refreshTokenCookieOptions(response.req),
       );
       setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
@@ -193,8 +159,7 @@ export class AuthController {
       this.identitySessions?.revokeSso(ssoSid),
     ]);
 
-    response.clearCookie('access_token', this.baseCookieOptions(response.req));
-    response.clearCookie('refresh_token', this.baseCookieOptions(response.req));
+    clearAuthCookies(response, response.req as Request);
     clearSsoCookie(response, response.req as Request);
 
     return {
@@ -220,14 +185,14 @@ export class AuthController {
     response.cookie(
       'access_token',
       result.access_token,
-      this.accessTokenCookieOptions(response.req),
+      accessTokenCookieOptions(response.req),
     );
 
     // Set refresh token mới vào cookie
     response.cookie(
       'refresh_token',
       result.refresh_token,
-      this.refreshTokenCookieOptions(response.req),
+      refreshTokenCookieOptions(response.req),
     );
     return {
       message: 'Làm mới token thành công',
@@ -385,12 +350,12 @@ export class AuthController {
     response.cookie(
       'access_token',
       tokens.access_token,
-      this.accessTokenCookieOptions(response.req),
+      accessTokenCookieOptions(response.req),
     );
     response.cookie(
       'refresh_token',
       tokens.refresh_token,
-      this.refreshTokenCookieOptions(response.req),
+      refreshTokenCookieOptions(response.req),
     );
     setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
@@ -467,12 +432,12 @@ export class AuthController {
     response.cookie(
       'access_token',
       tokens.access_token,
-      this.accessTokenCookieOptions(response.req),
+      accessTokenCookieOptions(response.req),
     );
     response.cookie(
       'refresh_token',
       tokens.refresh_token,
-      this.refreshTokenCookieOptions(response.req),
+      refreshTokenCookieOptions(response.req),
     );
     setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
@@ -540,12 +505,12 @@ export class AuthController {
     response.cookie(
       'access_token',
       tokens.access_token,
-      this.accessTokenCookieOptions(response.req),
+      accessTokenCookieOptions(response.req),
     );
     response.cookie(
       'refresh_token',
       tokens.refresh_token,
-      this.refreshTokenCookieOptions(response.req),
+      refreshTokenCookieOptions(response.req),
     );
     setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 
@@ -611,12 +576,12 @@ export class AuthController {
     response.cookie(
       'access_token',
       tokens.access_token,
-      this.accessTokenCookieOptions(response.req),
+      accessTokenCookieOptions(response.req),
     );
     response.cookie(
       'refresh_token',
       tokens.refresh_token,
-      this.refreshTokenCookieOptions(response.req),
+      refreshTokenCookieOptions(response.req),
     );
     setSsoCookie(response, response.req as Request, tokens.sso_session_id);
 

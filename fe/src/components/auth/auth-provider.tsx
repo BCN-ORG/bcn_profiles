@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { authService } from '@/services';
 import type { User } from '@/types';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
@@ -34,6 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ['me'],
     queryFn: authService.me,
     retry: false,
+    // Keep prior user across locale remounts while refetching.
+    placeholderData: (previous) => previous,
   });
 
   async function signOut() {
@@ -51,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user: query.data ?? null,
-        isLoading: query.isLoading,
+        user: query.data === undefined ? undefined : (query.data ?? null),
+        isLoading: query.isLoading && query.data === undefined,
         refresh: query.refetch,
         setUser: (user) => queryClient.setQueryData(['me'], user),
         signOut,
@@ -108,6 +111,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 export function LocaleSwitcher() {
   const locale = useLocale();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const query = searchParams.toString();
+  const href = query ? `${pathname}?${query}` : pathname;
 
   return (
     <div className="inline-flex items-center gap-0.5">
@@ -122,7 +128,7 @@ export function LocaleSwitcher() {
             locale === item && 'bg-primary/10 text-primary hover:bg-primary/15',
           )}
         >
-          <Link href={pathname} locale={item}>
+          <Link href={href} locale={item}>
             {item.toUpperCase()}
           </Link>
         </Button>
