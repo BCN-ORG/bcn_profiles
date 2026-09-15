@@ -27,7 +27,7 @@ export class OauthController {
     return (
       process.env.OAUTH_ISSUER?.trim() ||
       process.env.APP_URL?.trim() ||
-      'http://localhost:3000'
+      'http://localhost:3000/api'
     ).replace(/\/$/, '');
   }
 
@@ -41,7 +41,7 @@ export class OauthController {
       token_endpoint: `${issuer}/oauth/token`,
       revocation_endpoint: `${issuer}/oauth/revoke`,
       jwks_uri: `${issuer}/.well-known/jwks.json`,
-      userinfo_endpoint: `${issuer}/api/me`,
+      userinfo_endpoint: `${issuer}/me`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
       code_challenge_methods_supported: ['S256'],

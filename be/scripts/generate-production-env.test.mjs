@@ -9,8 +9,8 @@ function fixture() {
   const namespace = 'profiles';
   const vars = {};
   for (const line of readFileSync('.env.example', 'utf8').split('\n')) {
-    const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*?)(?:\s+# optional(?:\s.*)?)?$/);
-    if (!match || /\s+# optional(?:\s.*)?$/.test(line)) continue;
+    const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*?)(?:\s+# optional\b.*)?$/);
+    if (!match || /\s+# optional\b.*$/.test(line)) continue;
     vars[match[1]] = match[2].replace(/^"|"$/g, '') || 'test-value';
   }
   Object.assign(vars, {

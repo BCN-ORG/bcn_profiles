@@ -7,7 +7,7 @@ describe('OauthTokenService', () => {
     get: jest.fn((key: string) => {
       const values: Record<string, string> = {
         NODE_ENV: 'test',
-        OAUTH_ISSUER: 'https://profiles.bcn.id.vn',
+        OAUTH_ISSUER: 'https://profiles.bcn.id.vn/api',
         OAUTH_ACCESS_TOKEN_TTL_SECONDS: '900',
         JWT_RS256_KID: 'test-key',
       };
@@ -24,7 +24,7 @@ describe('OauthTokenService', () => {
       ['aud', 'exp', 'iat', 'iss', 'sid', 'sub'].sort(),
     );
     expect(payload).toMatchObject({
-      iss: 'https://profiles.bcn.id.vn',
+      iss: 'https://profiles.bcn.id.vn/api',
       sub: 'user-1',
       aud: 'quiz',
       sid: 'session-1',

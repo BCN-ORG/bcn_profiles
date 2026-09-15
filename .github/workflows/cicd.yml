@@ -184,7 +184,7 @@ jobs:
         run: |
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error \
-              "http://127.0.0.1:${HOST_PORT_VALUE}/health" >/dev/null; then
+              "http://127.0.0.1:${HOST_PORT_VALUE}/api/health" >/dev/null; then
               echo "Application is healthy"
               exit 0
             fi
@@ -207,7 +207,7 @@ jobs:
             cp -p .env.compose.rollback .env.compose
             cp -p docker-compose.yml.rollback docker-compose.yml
             docker compose --env-file .env.compose up -d app
-            docker compose --env-file .env.compose exec -T app node -e "fetch('http://127.0.0.1:' + process.env.APP_PORT + '/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+            docker compose --env-file .env.compose exec -T app node -e "fetch('http://127.0.0.1:' + process.env.APP_PORT + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
           fi
 
       - name: Remove rollback configuration after success

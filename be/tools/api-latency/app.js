@@ -1,4 +1,4 @@
-const DEFAULT_API = 'https://profiles.bcn.id.vn';
+const DEFAULT_API = 'https://profiles.bcn.id.vn/api';
 
 const ENDPOINTS = [
   { id: 'root', method: 'GET', path: '/', auth: false, label: 'Root' },
@@ -109,7 +109,7 @@ const state = {
 function defaultApiBase() {
   const host = window.location.hostname;
   if (host === 'profiles.bcn.id.vn' || host.endsWith('.bcn.id.vn')) {
-    return window.location.origin;
+    return `${window.location.origin}/api`;
   }
   return DEFAULT_API;
 }

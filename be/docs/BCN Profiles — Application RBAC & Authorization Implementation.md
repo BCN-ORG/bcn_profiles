@@ -855,7 +855,7 @@ Token vẫn giữ:
 
 ```json
 {
-  "iss": "https://profiles.bcn.id.vn",
+  "iss": "https://profiles.bcn.id.vn/api",
   "sub": "01K4BCN123",
   "aud": "quiz",
   "sid": "01K4SESSION456",

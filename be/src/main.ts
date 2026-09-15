@@ -16,6 +16,7 @@ async function bootstrap() {
   });
   const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
   app.useLogger(logger);
+  app.setGlobalPrefix('api');
 
   // Bảo mật HTTP headers (nới font/style cho latency tester UI)
   app.use(
@@ -42,7 +43,7 @@ async function bootstrap() {
   const latencyDir = join(process.cwd(), 'tools', 'api-latency');
   if (existsSync(latencyDir)) {
     app.useStaticAssets(latencyDir, {
-      prefix: '/latency-tester',
+      prefix: '/api/latency-tester',
       index: 'index.html',
     });
   }
@@ -101,7 +102,7 @@ async function bootstrap() {
   await app.listen(port);
   logger.log(`Application is running on port: ${port}`);
   if (existsSync(latencyDir)) {
-    logger.log(`API Latency Lab: http://localhost:${port}/latency-tester/`);
+    logger.log(`API Latency Lab: http://localhost:${port}/api/latency-tester/`);
   }
 }
 

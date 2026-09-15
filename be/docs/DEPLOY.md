@@ -27,7 +27,7 @@ Workflow không remove orphan services, không xóa volume và không restart sh
 
 ## Luồng deploy
 
-Push `main` → test/build image theo Git SHA → validate ENV → kiểm tra `bcn-infra` → generate `.env` quyền `600` tại `/opt/apps/<app>` → pull → migration bằng user app → cập nhật app → `GET /health`.
+Push `main` → test/build image theo Git SHA → validate ENV → kiểm tra `bcn-infra` → generate `.env` quyền `600` tại `/opt/apps/<app>` → pull → migration bằng user app → cập nhật app → `GET /api/health`.
 
 CI tạo thêm `.env.compose` chỉ chứa `IMAGE_NAME`, `IMAGE_TAG`, `APP_PORT`, `HOST_PORT` để Compose nội suy cấu hình mà không parse secret. Luôn dùng `--env-file .env.compose`.
 
@@ -40,7 +40,7 @@ docker compose --env-file .env.compose -f docker-compose.prod.yml config --quiet
 docker compose --env-file .env.compose -f docker-compose.prod.yml pull
 docker compose --env-file .env.compose -f docker-compose.prod.yml run --rm --no-deps --entrypoint npx app prisma migrate deploy
 docker compose --env-file .env.compose -f docker-compose.prod.yml up -d app
-curl --fail http://127.0.0.1:18085/health # Quiz: 18086
+curl --fail http://127.0.0.1:18085/api/health # Quiz: 18086
 ```
 
 Ứng dụng chỉ bind host port trên `127.0.0.1`; Nginx proxy đến port này. Không mở port DB/Redis/MinIO từ Compose app. Entrypoint không tự migration mỗi restart; stack local dùng `RUN_MIGRATIONS=true`.

@@ -31,7 +31,7 @@ export class OauthTokenService {
   constructor(config: ConfigService) {
     this.issuer =
       config.get<string>('OAUTH_ISSUER')?.trim() ||
-      'https://profiles.bcn.id.vn';
+      'https://profiles.bcn.id.vn/api';
     this.kid =
       config.get<string>('JWT_RS256_KID')?.trim() || 'bcn-profiles-2026-01';
     this.lifetimeSeconds = Number(

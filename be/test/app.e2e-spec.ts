@@ -23,6 +23,7 @@ describe('AppController HTTP contract (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('api');
     app.useGlobalInterceptors(new ResponseInterceptor());
     await app.init();
   });
@@ -31,9 +32,9 @@ describe('AppController HTTP contract (e2e)', () => {
     await app?.close();
   });
 
-  it('/ (GET) returns success envelope', () => {
+  it('/api (GET) returns success envelope', () => {
     return request(app.getHttpServer())
-      .get('/')
+      .get('/api')
       .expect(200)
       .expect((res) => {
         expect(res.body).toMatchObject({
@@ -43,9 +44,13 @@ describe('AppController HTTP contract (e2e)', () => {
       });
   });
 
-  it('/health (GET) reports readiness', () => {
+  it('/ (GET) is reserved for the frontend', () => {
+    return request(app.getHttpServer()).get('/').expect(404);
+  });
+
+  it('/api/health (GET) reports readiness', () => {
     return request(app.getHttpServer())
-      .get('/health')
+      .get('/api/health')
       .expect(200)
       .expect((res) => {
         expect(res.body).toMatchObject({

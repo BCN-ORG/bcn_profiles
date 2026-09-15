@@ -154,7 +154,7 @@ export class EmailService {
           <h2 style="color: #16a34a;">Tài khoản đã được phê duyệt ✅</h2>
           <p>Xin chào${fullName ? ` <b>${fullName}</b>` : ''},</p>
           <p>Tài khoản BCN Profiles của bạn đã được admin phê duyệt. Bạn có thể đăng nhập ngay bây giờ.</p>
-          <a href="${this.configService.get<string>('APP_URL') || 'http://localhost:3000'}/auth/login"
+          <a href="${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3001'}/login"
              style="display:inline-block;padding:12px 24px;background:#4F46E5;color:#fff;border-radius:6px;text-decoration:none;margin-top:16px;"
           >Đăng nhập ngay</a>
           <p style="margin-top:24px;color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} BCN Profiles</p>

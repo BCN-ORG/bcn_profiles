@@ -1569,7 +1569,7 @@ Sau khi vượt qua Membership Gate:
 
 ```json
 {
-  "iss": "https://profiles.bcn.id.vn",
+  "iss": "https://profiles.bcn.id.vn/api",
   "sub": "01K4BCN123",
   "aud": "quiz",
   "sid": "01K4SESSION456",
@@ -1767,7 +1767,7 @@ Quiz:
 ```text
 quiz.bcn.id.vn
        ↓
-profiles.bcn.id.vn/oauth/authorize
+profiles.bcn.id.vn/api/oauth/authorize
        ↓
 BCN SSO?
        │

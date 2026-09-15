@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IdentitySessionService } from '../identity/session.service';
 import { OauthTokenService } from './oauth-token.service';
 
-@Controller('api')
+@Controller()
 export class UserinfoController {
   constructor(
     private readonly prisma: PrismaService,

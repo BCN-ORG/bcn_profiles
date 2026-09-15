@@ -1,6 +1,6 @@
 # API Documentation — BCN Profiles
 
-**Base URL (production):** `https://profiles.bcn.id.vn`
+**Base URL (production):** `https://profiles.bcn.id.vn/api`
 
 > Request/response API là JSON (`Content-Type: application/json`); PUT file tới MinIO dùng body nhị phân.
 > Authentication sử dụng **HttpOnly cookie** — FE phải gửi kèm `credentials: 'include'` (fetch) hoặc `withCredentials: true` (axios).  
@@ -1518,7 +1518,7 @@ Xóa vĩnh viễn một user. Admin không thể tự xóa chính mình.
 
 ## Upload avatar MinIO
 
-**Base URL:** `https://profiles.bcn.id.vn` (local: `http://localhost:3000`). Cả ba endpoint yêu cầu cookie `access_token`, role USER hoặc ADMIN; Profiles không nhận Bearer access token cho các endpoint này.
+**Base URL:** `https://profiles.bcn.id.vn/api` (local: `http://localhost:3000/api`). Cả ba endpoint yêu cầu cookie `access_token`, role USER hoặc ADMIN; Profiles không nhận Bearer access token cho các endpoint này.
 
 | Method | Endpoint | Kết quả |
 | --- | --- | --- |
@@ -1594,7 +1594,7 @@ async function uploadToMinio(apiBase, signaturePath, file) {
 ### Lưu và xóa avatar
 
 ```javascript
-const apiBase = 'https://profiles.bcn.id.vn';
+const apiBase = 'https://profiles.bcn.id.vn/api';
 const signed = await uploadToMinio(apiBase, '/users/me/avatar/upload-signature', file);
 const saveResponse = await fetch(`${apiBase}/users/me/avatar`, {
   method: 'PATCH',
@@ -1787,10 +1787,10 @@ Xóa timeline event. Chỉ admin mới có quyền xóa.
 ```js
 // axios — áp dụng một lần toàn app
 axios.defaults.withCredentials = true;
-axios.defaults.baseURL = 'https://profiles.bcn.id.vn';
+axios.defaults.baseURL = 'https://profiles.bcn.id.vn/api';
 
 // fetch — thêm vào từng request
-fetch('https://profiles.bcn.id.vn/auth/login', {
+fetch('https://profiles.bcn.id.vn/api/auth/login', {
   method: 'POST',
   credentials: 'include',
   headers: { 'Content-Type': 'application/json' },
