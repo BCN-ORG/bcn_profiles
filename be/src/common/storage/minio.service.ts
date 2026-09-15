@@ -125,8 +125,7 @@ export class MinioService implements OnModuleInit {
     }
     const allowedOrigins = [...origins]
       .map(
-        (origin) =>
-          `    <AllowedOrigin>${escapeXml(origin)}</AllowedOrigin>`,
+        (origin) => `    <AllowedOrigin>${escapeXml(origin)}</AllowedOrigin>`,
       )
       .join('\n');
     const corsXml = `<?xml version="1.0" encoding="UTF-8"?>
