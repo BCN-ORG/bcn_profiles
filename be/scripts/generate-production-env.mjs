@@ -5,10 +5,12 @@ const secrets = JSON.parse(process.env.PRODUCTION_SECRETS || '{}');
 const values = {};
 const optional = new Set();
 for (const line of readFileSync('.env.example', 'utf8').split('\n')) {
-  const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*?)(?:\s+# optional)?$/);
+  const match = line.match(
+    /^([A-Z][A-Z0-9_]*)=(.*?)(?:\s+# optional(?:\s.*)?)?$/,
+  );
   if (!match) continue;
   const [, key, fallback] = match;
-  if (line.endsWith('# optional')) optional.add(key);
+  if (/\s+# optional(?:\s.*)?$/.test(line)) optional.add(key);
   values[key] =
     secrets[key] ||
     vars[key] ||

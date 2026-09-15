@@ -350,9 +350,21 @@
     "manageUser": "Open user",
     "usersHint": "Grant, block, or assign roles from the user detail page.",
     "noUsers": "No users have access to this app yet.",
+    "grantAccess": "Grant access",
+    "blockAccess": "Block access",
+    "memberUserId": "User ID to grant access",
     "rolesShort": "roles",
     "permsShort": "perms",
     "usersShort": "users",
-    "remove": "Remove"
+    "remove": "Remove",
+    "tabManagers": "Managers",
+    "managersHint": "Managers can only administer assigned applications; enter a user ID to add one.",
+    "managerUserId": "User ID",
+    "addManager": "Add manager",
+    "noManagers": "No application managers yet.",
+    "tabManifest": "Manifest",
+    "manifestHint": "Paste bcn-app.yml. Removed roles and permissions are deprecated instead of immediately deleted.",
+    "importManifest": "Import manifest",
+    "manifestImported": "Manifest imported."
   }
 }

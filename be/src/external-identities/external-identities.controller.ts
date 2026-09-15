@@ -92,7 +92,8 @@ export class ExternalIdentitiesController {
   ) {
     const frontend = this.frontendUrl();
     if (oauthError || !state || !code) {
-      const reason = oauthError === 'access_denied' ? 'cancelled' : 'incomplete';
+      const reason =
+        oauthError === 'access_denied' ? 'cancelled' : 'incomplete';
       if (frontend) {
         response.redirect(this.oauthFrontendPath(provider, reason));
         return;
@@ -169,8 +170,7 @@ export class ExternalIdentitiesController {
 
   private oauthFrontendPath(provider: string, status: string): string {
     const frontend = this.frontendUrl()!;
-    const step =
-      provider.toLowerCase() === 'discord' ? 'discord' : 'optional';
+    const step = provider.toLowerCase() === 'discord' ? 'discord' : 'optional';
     const path =
       status === 'linked' || status === 'cancelled' || status === 'incomplete'
         ? `/welcome/${step}`

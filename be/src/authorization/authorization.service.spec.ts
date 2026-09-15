@@ -3,6 +3,9 @@ import { AuthorizationService } from './authorization.service';
 describe('AuthorizationService', () => {
   function setup(assignments: unknown[] = []) {
     const prisma = {
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
+      },
       application: {
         findFirst: jest.fn().mockResolvedValue({
           id: 'app-quiz',
@@ -33,15 +36,18 @@ describe('AuthorizationService', () => {
       del: jest.fn(),
     };
     const sessions = { revokeUserAppSessions: jest.fn() };
+    const membership = { assertEligible: jest.fn().mockResolvedValue({}) };
     return {
       service: new AuthorizationService(
         prisma as any,
         redis as any,
         sessions as any,
+        membership as any,
       ),
       prisma,
       redis,
       sessions,
+      membership,
     };
   }
 
@@ -61,6 +67,37 @@ describe('AuthorizationService', () => {
     await expect(
       service.check('user-1', 'quiz', 'quiz.question.create'),
     ).resolves.toBe(false);
+  });
+
+  it('returns the union of permissions from multiple roles in one app', async () => {
+    const { service } = setup([
+      {
+        role: {
+          code: 'ORGANIZER',
+          permissions: [{ permission: { code: 'event.participant.read' } }],
+        },
+      },
+      {
+        role: {
+          code: 'CHECKIN_STAFF',
+          permissions: [{ permission: { code: 'event.checkin.execute' } }],
+        },
+      },
+    ]);
+
+    await expect(service.resolve('user-1', 'event')).resolves.toMatchObject({
+      roles: ['ORGANIZER', 'CHECKIN_STAFF'],
+      permissions: ['event.participant.read', 'event.checkin.execute'],
+    });
+  });
+
+  it('denies runtime authorization when the user is not active', async () => {
+    const { service, prisma } = setup();
+    prisma.user.findUnique.mockResolvedValue({ status: 'BLOCKED' });
+
+    await expect(service.resolve('user-1', 'quiz')).rejects.toMatchObject({
+      response: { code: 'USER_INACTIVE' },
+    });
   });
 
   it('invalidates authorization and revokes only that app sessions when blocked', async () => {

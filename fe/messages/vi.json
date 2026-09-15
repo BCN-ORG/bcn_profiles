@@ -350,9 +350,21 @@
     "manageUser": "Mở user",
     "usersHint": "Cấp/chặn và gán role tại trang chi tiết người dùng.",
     "noUsers": "Chưa có user nào được cấp quyền app này.",
+    "grantAccess": "Cấp truy cập",
+    "blockAccess": "Chặn truy cập",
+    "memberUserId": "ID người dùng cần cấp truy cập",
     "rolesShort": "role",
     "permsShort": "quyền",
     "usersShort": "user",
-    "remove": "Xóa"
+    "remove": "Xóa",
+    "tabManagers": "Quản lý ứng dụng",
+    "managersHint": "Manager chỉ quản lý ứng dụng được giao; nhập ID của người dùng để thêm.",
+    "managerUserId": "ID người dùng",
+    "addManager": "Thêm manager",
+    "noManagers": "Chưa có application manager.",
+    "tabManifest": "Manifest",
+    "manifestHint": "Dán nội dung bcn-app.yml. Role/quyền bị bỏ sẽ được đánh dấu deprecated, không xóa ngay.",
+    "importManifest": "Import manifest",
+    "manifestImported": "Đã import manifest."
   }
 }

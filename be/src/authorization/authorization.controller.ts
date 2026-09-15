@@ -1,11 +1,13 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Headers,
   Param,
   Patch,
   Post,
+  Put,
   Delete,
   Query,
   Req,
@@ -22,6 +24,7 @@ import {
   IsInt,
   Min,
 } from 'class-validator';
+import { load } from 'js-yaml';
 import { Type } from 'class-transformer';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -31,6 +34,8 @@ import { IdentitySessionService } from '../identity/session.service';
 import { OauthTokenService } from '../oauth/oauth-token.service';
 import { AuthorizationService } from './authorization.service';
 import { ApplicationsAdminService } from './applications-admin.service';
+import type { ApplicationManifest } from './applications-admin.service';
+import { ManageApplication } from './manage-application.decorator';
 
 class PermissionDto {
   @IsString() permission!: string;
@@ -62,7 +67,7 @@ class AuditQueryDto {
   limit?: number;
 }
 
-type CurrentUser = { id: string };
+type CurrentUser = { id: string; role: string };
 
 class CreateApplicationDto {
   @IsString() code!: string;
@@ -86,11 +91,26 @@ class RedirectUriDto {
 class RoleDto {
   @IsString() code!: string;
   @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() description?: string;
+}
+
+class UpdateRoleDto {
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() description?: string;
 }
 
 class PermissionDtoBody {
   @IsString() code!: string;
   @IsOptional() @IsString() description?: string;
+}
+
+class UpdatePermissionDto {
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsBoolean() deprecated?: boolean;
+}
+
+class ManifestDto {
+  @IsString() content!: string;
 }
 
 @Controller()
@@ -157,7 +177,12 @@ export class AuthorizationController {
         session!.application === payload.aud;
       return response.json(
         active
-          ? { active: true, sub: payload.sub, aud: payload.aud, sid: payload.sid }
+          ? {
+              active: true,
+              sub: payload.sub,
+              aud: payload.aud,
+              sid: payload.sid,
+            }
           : { active: false, reason: 'SESSION_REVOKED' },
       );
     } catch {
@@ -166,13 +191,14 @@ export class AuthorizationController {
   }
 
   @Get('admin/applications')
-  @Roles(Role.ADMIN)
-  listApplications() {
-    return this.appsAdmin.listApplications();
+  @Roles(Role.ADMIN, Role.USER)
+  listApplications(@User() actor: CurrentUser) {
+    return this.appsAdmin.listApplications(actor);
   }
 
   @Get('admin/applications/:app')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
   getApplication(@Param('app') app: string) {
     return this.appsAdmin.getApplication(app);
   }
@@ -210,6 +236,23 @@ export class AuthorizationController {
     return this.appsAdmin.createRole(app, dto);
   }
 
+  @Get('admin/applications/:app/roles')
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
+  listApplicationRoles(@Param('app') app: string) {
+    return this.appsAdmin.listRoles(app);
+  }
+
+  @Patch('admin/applications/:app/roles/:role')
+  @Roles(Role.ADMIN)
+  updateRole(
+    @Param('app') app: string,
+    @Param('role') role: string,
+    @Body() dto: UpdateRoleDto,
+  ) {
+    return this.appsAdmin.updateRole(app, role, dto);
+  }
+
   @Delete('admin/applications/:app/roles/:role')
   @Roles(Role.ADMIN)
   deleteRole(@Param('app') app: string, @Param('role') role: string) {
@@ -218,11 +261,25 @@ export class AuthorizationController {
 
   @Post('admin/applications/:app/permissions')
   @Roles(Role.ADMIN)
-  createPermission(
-    @Param('app') app: string,
-    @Body() dto: PermissionDtoBody,
-  ) {
+  createPermission(@Param('app') app: string, @Body() dto: PermissionDtoBody) {
     return this.appsAdmin.createPermission(app, dto);
+  }
+
+  @Get('admin/applications/:app/permissions')
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
+  listApplicationPermissions(@Param('app') app: string) {
+    return this.appsAdmin.listPermissions(app);
+  }
+
+  @Patch('admin/applications/:app/permissions/:permission')
+  @Roles(Role.ADMIN)
+  updatePermission(
+    @Param('app') app: string,
+    @Param('permission') permission: string,
+    @Body() dto: UpdatePermissionDto,
+  ) {
+    return this.appsAdmin.updatePermission(app, permission, dto);
   }
 
   @Delete('admin/applications/:app/permissions/:permission')
@@ -244,6 +301,16 @@ export class AuthorizationController {
     return this.appsAdmin.grantPermissionToRole(app, role, permission);
   }
 
+  @Put('admin/applications/:app/roles/:role/permissions')
+  @Roles(Role.ADMIN)
+  setRolePermissions(
+    @Param('app') app: string,
+    @Param('role') role: string,
+    @Body() dto: PermissionsDto,
+  ) {
+    return this.appsAdmin.setRolePermissions(app, role, dto.permissions);
+  }
+
   @Delete('admin/applications/:app/roles/:role/permissions/:permission')
   @Roles(Role.ADMIN)
   revokeRolePermission(
@@ -255,9 +322,49 @@ export class AuthorizationController {
   }
 
   @Get('admin/applications/:app/users')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
   listAppUsers(@Param('app') app: string) {
     return this.appsAdmin.listAppUsers(app);
+  }
+
+  @Get('admin/applications/:app/managers')
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
+  listManagers(@Param('app') app: string) {
+    return this.appsAdmin.listManagers(app);
+  }
+
+  @Post('admin/applications/:app/managers/:userId')
+  @Roles(Role.ADMIN)
+  addManager(
+    @User() actor: CurrentUser,
+    @Param('app') app: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.appsAdmin.addManager(actor.id, app, userId);
+  }
+
+  @Delete('admin/applications/:app/managers/:userId')
+  @Roles(Role.ADMIN)
+  removeManager(
+    @User() actor: CurrentUser,
+    @Param('app') app: string,
+    @Param('userId') userId: string,
+  ) {
+    return this.appsAdmin.removeManager(actor.id, app, userId);
+  }
+
+  @Post('admin/applications/import')
+  @Roles(Role.ADMIN)
+  importManifest(@Body() dto: ManifestDto) {
+    let manifest: ApplicationManifest;
+    try {
+      manifest = load(dto.content) as ApplicationManifest;
+    } catch {
+      throw new BadRequestException('Manifest YAML is invalid');
+    }
+    return this.appsAdmin.importManifest(manifest);
   }
 
   @Get('me/applications')
@@ -308,7 +415,8 @@ export class AuthorizationController {
   }
 
   @Post('admin/users/:userId/applications/:app/grant')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
   grant(
     @User() actor: CurrentUser,
     @Param('userId') userId: string,
@@ -318,7 +426,8 @@ export class AuthorizationController {
   }
 
   @Post('admin/users/:userId/applications/:app/block')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
   block(
     @User() actor: CurrentUser,
     @Param('userId') userId: string,
@@ -328,13 +437,15 @@ export class AuthorizationController {
   }
 
   @Get('admin/users/:userId/applications/:app/roles')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
   listRoles(@Param('userId') userId: string, @Param('app') app: string) {
     return this.authorization.listRoles(userId, app);
   }
 
   @Post('admin/users/:userId/applications/:app/roles/:role')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
   assignRole(
     @User() actor: CurrentUser,
     @Param('userId') userId: string,
@@ -345,7 +456,8 @@ export class AuthorizationController {
   }
 
   @Delete('admin/users/:userId/applications/:app/roles/:role')
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.USER)
+  @ManageApplication()
   removeRole(
     @User() actor: CurrentUser,
     @Param('userId') userId: string,

@@ -52,6 +52,7 @@ describe('MembershipService', () => {
       ),
       setJson: jest.fn(),
       del: jest.fn(),
+      delByPrefix: jest.fn(),
     };
     const sessions = { revokeAllUserSessions: jest.fn() };
     const config = {

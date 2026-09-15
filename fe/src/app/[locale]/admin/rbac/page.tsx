@@ -12,6 +12,8 @@ import {
   Shield,
   Trash2,
   Users,
+  Upload,
+  UserCog,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import {
@@ -20,7 +22,11 @@ import {
   PageHeader,
   StatusBadge,
 } from '@/components/ui/primitives';
-import { rbacService, type RbacApplication } from '@/services';
+import {
+  applicationService,
+  rbacService,
+  type RbacApplication,
+} from '@/services';
 import { PageShell } from '@/components/layout/page-shell';
 import {
   Card,
@@ -33,6 +39,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/components/auth/auth-provider';
+import { isAdmin } from '@/lib/onboarding';
 
 function roleHasPermission(
   app: RbacApplication,
@@ -47,6 +56,8 @@ export default function AdminRbacPage() {
   const t = useTranslations('rbac');
   const tc = useTranslations('common');
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const platformAdmin = isAdmin(user);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -62,13 +73,16 @@ export default function AdminRbacPage() {
   const [newUri, setNewUri] = useState('');
   const [newRole, setNewRole] = useState({ code: '', name: '' });
   const [newPerm, setNewPerm] = useState({ code: '', description: '' });
+  const [managerUserId, setManagerUserId] = useState('');
+  const [memberUserId, setMemberUserId] = useState('');
+  const [manifest, setManifest] = useState('');
 
   const appsQuery = useQuery({
     queryKey: ['admin', 'rbac', 'apps'],
     queryFn: () => rbacService.listApps(),
   });
 
-  const apps = appsQuery.data ?? [];
+  const apps = useMemo(() => appsQuery.data ?? [], [appsQuery.data]);
   const filteredApps = useMemo(() => {
     const q = appFilter.trim().toLowerCase();
     if (!q) return apps;
@@ -117,6 +131,15 @@ export default function AdminRbacPage() {
     }
   }
 
+  async function importManifest(event: FormEvent) {
+    event.preventDefault();
+    await run(async () => {
+      const imported = await rbacService.importManifest(manifest);
+      setSelectedCode(imported.code);
+      setManifest('');
+    }, t('manifestImported'));
+  }
+
   async function createApp(event: FormEvent) {
     event.preventDefault();
     await run(async () => {
@@ -145,17 +168,16 @@ export default function AdminRbacPage() {
         title={t('title')}
         description={t('subtitle')}
         actions={
-          <Button
-            type="button"
-            onClick={() => setShowCreate((v) => !v)}
-          >
-            <Plus className="size-4" aria-hidden />
-            {t('createApp')}
-          </Button>
+          platformAdmin ? (
+            <Button type="button" onClick={() => setShowCreate((v) => !v)}>
+              <Plus className="size-4" aria-hidden />
+              {t('createApp')}
+            </Button>
+          ) : undefined
         }
       />
 
-      {showCreate ? (
+      {showCreate && platformAdmin ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('createApp')}</CardTitle>
@@ -351,7 +373,9 @@ export default function AdminRbacPage() {
                     </span>
                     <span className="inline-flex items-center gap-1">
                       <Users className="size-3.5" aria-hidden />
-                      {app._count?.userAccess ?? usersQuery.data?.length ?? 0}{' '}
+                      {app._count?.userAccess ??
+                        usersQuery.data?.length ??
+                        0}{' '}
                       {t('usersShort')}
                     </span>
                   </div>
@@ -361,7 +385,7 @@ export default function AdminRbacPage() {
                     type="button"
                     size="sm"
                     variant="secondary"
-                    disabled={busy}
+                    disabled={busy || !platformAdmin}
                     onClick={() =>
                       run(() =>
                         rbacService.updateApp(app.code, {
@@ -377,7 +401,7 @@ export default function AdminRbacPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={busy}
+                    disabled={busy || !platformAdmin}
                     onClick={() =>
                       run(() =>
                         rbacService.updateApp(app.code, {
@@ -397,6 +421,10 @@ export default function AdminRbacPage() {
                 <TabsTrigger value="access">{t('tabAccess')}</TabsTrigger>
                 <TabsTrigger value="uris">{t('tabUris')}</TabsTrigger>
                 <TabsTrigger value="users">{t('tabUsers')}</TabsTrigger>
+                <TabsTrigger value="managers">{t('tabManagers')}</TabsTrigger>
+                {platformAdmin ? (
+                  <TabsTrigger value="manifest">{t('tabManifest')}</TabsTrigger>
+                ) : null}
               </TabsList>
 
               {/* Role + permission (role-centric) */}
@@ -425,6 +453,7 @@ export default function AdminRbacPage() {
                             setNewRole((r) => ({ ...r, code: e.target.value }))
                           }
                           required
+                          disabled={!platformAdmin}
                           className="h-9"
                         />
                         <Input
@@ -434,12 +463,13 @@ export default function AdminRbacPage() {
                             setNewRole((r) => ({ ...r, name: e.target.value }))
                           }
                           className="h-9"
+                          disabled={!platformAdmin}
                         />
                         <Button
                           type="submit"
                           size="sm"
                           className="w-full"
-                          disabled={busy}
+                          disabled={busy || !platformAdmin}
                         >
                           <Plus className="size-3.5" aria-hidden />
                           {t('addRole')}
@@ -473,7 +503,7 @@ export default function AdminRbacPage() {
                                 size="icon"
                                 variant="ghost"
                                 className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                disabled={busy}
+                                disabled={busy || !platformAdmin}
                                 aria-label={t('remove')}
                                 onClick={() =>
                                   run(() =>
@@ -528,6 +558,7 @@ export default function AdminRbacPage() {
                             }))
                           }
                           required
+                          disabled={!platformAdmin}
                           className="h-9 font-mono text-xs"
                         />
                         <Input
@@ -540,8 +571,13 @@ export default function AdminRbacPage() {
                             }))
                           }
                           className="h-9"
+                          disabled={!platformAdmin}
                         />
-                        <Button type="submit" size="sm" disabled={busy}>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={busy || !platformAdmin}
+                        >
                           <Plus className="size-3.5" aria-hidden />
                           {t('addPerm')}
                         </Button>
@@ -569,21 +605,27 @@ export default function AdminRbacPage() {
                                     type="checkbox"
                                     className="mt-1 size-4 accent-[var(--primary)]"
                                     checked={granted}
-                                    disabled={busy}
+                                    disabled={busy || !platformAdmin}
                                     onChange={() =>
-                                      run(() =>
-                                        granted
-                                          ? rbacService.revokeRolePermission(
-                                              app.code,
-                                              activeRoleCode,
-                                              perm.code,
-                                            )
-                                          : rbacService.grantRolePermission(
-                                              app.code,
-                                              activeRoleCode,
-                                              perm.code,
-                                            ),
-                                      )
+                                      run(() => {
+                                        const current = app.roles
+                                          .find(
+                                            (role) =>
+                                              role.code === activeRoleCode,
+                                          )!
+                                          .permissions.map(
+                                            ({ permission }) => permission.code,
+                                          );
+                                        return rbacService.setRolePermissions(
+                                          app.code,
+                                          activeRoleCode,
+                                          granted
+                                            ? current.filter(
+                                                (code) => code !== perm.code,
+                                              )
+                                            : [...current, perm.code],
+                                        );
+                                      })
                                     }
                                   />
                                   <span className="min-w-0">
@@ -602,7 +644,7 @@ export default function AdminRbacPage() {
                                   size="icon"
                                   variant="ghost"
                                   className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                  disabled={busy}
+                                  disabled={busy || !platformAdmin}
                                   aria-label={t('remove')}
                                   onClick={() =>
                                     run(() =>
@@ -648,8 +690,9 @@ export default function AdminRbacPage() {
                         value={newUri}
                         onChange={(e) => setNewUri(e.target.value)}
                         className="flex-1"
+                        disabled={!platformAdmin}
                       />
-                      <Button type="submit" disabled={busy}>
+                      <Button type="submit" disabled={busy || !platformAdmin}>
                         <Plus className="size-4" aria-hidden />
                         {t('addUri')}
                       </Button>
@@ -668,7 +711,7 @@ export default function AdminRbacPage() {
                               type="button"
                               size="sm"
                               variant="ghost"
-                              disabled={busy}
+                              disabled={busy || !platformAdmin}
                               onClick={() =>
                                 run(() =>
                                   rbacService.removeRedirectUri(
@@ -697,7 +740,32 @@ export default function AdminRbacPage() {
                     <CardTitle className="text-sm">{t('tabUsers')}</CardTitle>
                     <CardDescription>{t('usersHint')}</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
+                    <form
+                      className="flex flex-col gap-2 sm:flex-row"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        run(async () => {
+                          await applicationService.grant(
+                            memberUserId,
+                            app.code,
+                          );
+                          setMemberUserId('');
+                        });
+                      }}
+                    >
+                      <Input
+                        value={memberUserId}
+                        onChange={(event) =>
+                          setMemberUserId(event.target.value)
+                        }
+                        placeholder={t('memberUserId')}
+                        required
+                      />
+                      <Button type="submit" disabled={busy}>
+                        {t('grantAccess')}
+                      </Button>
+                    </form>
                     {(usersQuery.data ?? []).length === 0 ? (
                       <EmptyState title={t('noUsers')} />
                     ) : (
@@ -714,13 +782,76 @@ export default function AdminRbacPage() {
                               <p className="truncate text-xs text-muted-foreground">
                                 {row.user.email}
                               </p>
+                              <p className="mt-1 truncate text-xs text-muted-foreground">
+                                {row.roles.join(', ') || '—'}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              {app.roles.map((role) => {
+                                const assigned = row.roles.includes(role.code);
+                                return (
+                                  <label
+                                    key={role.id}
+                                    className="flex items-center gap-1 text-xs"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={assigned}
+                                      disabled={busy}
+                                      onChange={() =>
+                                        run(() =>
+                                          assigned
+                                            ? applicationService.removeRole(
+                                                row.user.id,
+                                                app.code,
+                                                role.code,
+                                              )
+                                            : applicationService.assignRole(
+                                                row.user.id,
+                                                app.code,
+                                                role.code,
+                                              ),
+                                        )
+                                      }
+                                    />
+                                    {role.code}
+                                  </label>
+                                );
+                              })}
                             </div>
                             <StatusBadge status={row.status} />
-                            <Button asChild size="sm" variant="outline">
-                              <Link href={`/admin/users/${row.user.id}`}>
-                                {t('manageUser')}
-                              </Link>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={
+                                row.status === 'ACTIVE' ? 'danger' : 'outline'
+                              }
+                              disabled={busy}
+                              onClick={() =>
+                                run(() =>
+                                  row.status === 'ACTIVE'
+                                    ? applicationService.block(
+                                        row.user.id,
+                                        app.code,
+                                      )
+                                    : applicationService.grant(
+                                        row.user.id,
+                                        app.code,
+                                      ),
+                                )
+                              }
+                            >
+                              {row.status === 'ACTIVE'
+                                ? t('blockAccess')
+                                : t('grantAccess')}
                             </Button>
+                            {platformAdmin ? (
+                              <Button asChild size="sm" variant="outline">
+                                <Link href={`/admin/users/${row.user.id}`}>
+                                  {t('manageUser')}
+                                </Link>
+                              </Button>
+                            ) : null}
                           </li>
                         ))}
                       </ul>
@@ -728,6 +859,110 @@ export default function AdminRbacPage() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              <TabsContent value="managers" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                      <UserCog className="size-4" aria-hidden />
+                      {t('tabManagers')}
+                    </CardTitle>
+                    <CardDescription>{t('managersHint')}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <form
+                      className="flex flex-col gap-2 sm:flex-row"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        run(async () => {
+                          await rbacService.addManager(app.code, managerUserId);
+                          setManagerUserId('');
+                        });
+                      }}
+                    >
+                      <Input
+                        value={managerUserId}
+                        onChange={(event) =>
+                          setManagerUserId(event.target.value)
+                        }
+                        placeholder={t('managerUserId')}
+                        required
+                        disabled={!platformAdmin}
+                      />
+                      <Button type="submit" disabled={busy || !platformAdmin}>
+                        {t('addManager')}
+                      </Button>
+                    </form>
+                    {app.managers.length ? (
+                      <ul className="divide-y divide-border/60 rounded-xl border border-border/70">
+                        {app.managers.map((manager) => (
+                          <li
+                            key={manager.userId}
+                            className="flex items-center gap-3 px-3 py-3"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">
+                                {manager.user.fullName || manager.user.email}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {manager.user.email}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy || !platformAdmin}
+                              onClick={() =>
+                                run(() =>
+                                  rbacService.removeManager(
+                                    app.code,
+                                    manager.userId,
+                                  ),
+                                )
+                              }
+                            >
+                              <Trash2 className="size-3.5" aria-hidden />
+                              {t('remove')}
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <EmptyState title={t('noManagers')} />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {platformAdmin ? (
+                <TabsContent value="manifest" className="mt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <Upload className="size-4" aria-hidden />
+                        {t('tabManifest')}
+                      </CardTitle>
+                      <CardDescription>{t('manifestHint')}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form className="space-y-3" onSubmit={importManifest}>
+                        <Textarea
+                          value={manifest}
+                          onChange={(event) => setManifest(event.target.value)}
+                          placeholder="app:\n  code: quiz\n  name: BCN Quiz\n  clientId: bcn-quiz"
+                          className="min-h-64 font-mono text-xs"
+                          required
+                        />
+                        <Button type="submit" disabled={busy}>
+                          <Upload className="size-4" aria-hidden />
+                          {t('importManifest')}
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              ) : null}
             </Tabs>
           </div>
         ) : appsQuery.isLoading ? (

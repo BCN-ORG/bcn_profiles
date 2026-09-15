@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
@@ -14,14 +14,10 @@ import {
   auditService,
   membershipService,
   securityService,
+  rbacService,
 } from '@/services';
 import { Link, useRouter } from '@/i18n/navigation';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -72,12 +68,27 @@ export default function AdminUserDetailPage() {
     queryKey: ['admin', 'user', userId, '2fa'],
     queryFn: () => securityService.adminStatus(userId),
   });
+  const appCatalog = useQuery({
+    queryKey: ['admin', 'rbac', 'apps'],
+    queryFn: () => rbacService.listApps(),
+  });
 
-  const [overrideStatus, setOverrideStatus] = useState<'ALLOW' | 'DENY'>('ALLOW');
+  const [overrideStatus, setOverrideStatus] = useState<'ALLOW' | 'DENY'>(
+    'ALLOW',
+  );
   const [reason, setReason] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
-  const [appCode, setAppCode] = useState('QUIZ');
-  const [roleCode, setRoleCode] = useState('MEMBER');
+  const [appCode, setAppCode] = useState('');
+  const [roleCode, setRoleCode] = useState('');
+  const selectedApp = appCatalog.data?.find((app) => app.code === appCode);
+
+  useEffect(() => {
+    if (!appCode && appCatalog.data?.[0]) setAppCode(appCatalog.data[0].code);
+  }, [appCatalog.data, appCode]);
+
+  useEffect(() => {
+    setRoleCode(selectedApp?.roles[0]?.code ?? '');
+  }, [appCode, selectedApp?.roles]);
 
   const invalidate = async () => {
     await Promise.all([
@@ -294,7 +305,10 @@ export default function AdminUserDetailPage() {
                 status={membership.data?.sources.zalo?.status || 'UNKNOWN'}
               />
             </div>
-            <form className="grid gap-4 border-t pt-4" onSubmit={submitOverride}>
+            <form
+              className="grid gap-4 border-t pt-4"
+              onSubmit={submitOverride}
+            >
               <h4 className="font-medium">{t('overrideTitle')}</h4>
               <div className="space-y-2">
                 <Label>{t('overrideStatus')}</Label>
@@ -371,10 +385,18 @@ export default function AdminUserDetailPage() {
             >
               <div className="space-y-2">
                 <Label>App code</Label>
-                <Input
-                  value={appCode}
-                  onChange={(e) => setAppCode(e.target.value)}
-                />
+                <Select value={appCode} onValueChange={setAppCode}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(appCatalog.data ?? []).map((item) => (
+                      <SelectItem key={item.id} value={item.code}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="submit">{t('grantApp')}</Button>
@@ -410,10 +432,18 @@ export default function AdminUserDetailPage() {
             >
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Input
-                  value={roleCode}
-                  onChange={(e) => setRoleCode(e.target.value)}
-                />
+                <Select value={roleCode} onValueChange={setRoleCode}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(selectedApp?.roles ?? []).map((role) => (
+                      <SelectItem key={role.id} value={role.code}>
+                        {role.name || role.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="submit">{t('assignRole')}</Button>

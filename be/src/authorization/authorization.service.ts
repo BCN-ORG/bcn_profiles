@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { IdentitySessionService } from '../identity/session.service';
+import { MembershipService } from '../membership/membership.service';
 import type { AppAccessStatus } from 'prisma/client/enums';
 
 export type AuthorizationContext = {
@@ -25,6 +26,7 @@ export class AuthorizationService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly sessions: IdentitySessionService,
+    private readonly membership: MembershipService,
   ) {}
 
   async getApplication(clientIdOrCode: string) {
@@ -66,6 +68,17 @@ export class AuthorizationService {
     appCode: string,
   ): Promise<AuthorizationContext> {
     const code = appCode.toUpperCase();
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { status: true },
+    });
+    if (user?.status !== 'ACTIVE') {
+      throw new ForbiddenException({
+        code: 'USER_INACTIVE',
+        message: 'User is not active',
+      });
+    }
+    await this.membership.assertEligible(userId);
     const cacheKey = `authz:${userId}:${code.toLowerCase()}`;
     const cached = await this.redis.getJson<AuthorizationContext>(cacheKey);
     if (cached) return cached;
@@ -236,12 +249,17 @@ export class AuthorizationService {
           roleId: role.id,
         },
       },
-      create: { userId, applicationId: app.id, roleId: role.id },
+      create: {
+        userId,
+        applicationId: app.id,
+        roleId: role.id,
+        assignedBy: actorId,
+      },
       update: {},
     });
     await Promise.all([
       this.invalidate(userId, app.code),
-      this.audit(actorId, 'ROLE_GRANTED', app.code, {
+      this.audit(actorId, 'ROLE_ASSIGNED', app.code, {
         userId,
         role: role.code,
       }),
@@ -279,6 +297,21 @@ export class AuthorizationService {
 
   async invalidate(userId: string, app: string): Promise<void> {
     await this.redis.del(`authz:${userId}:${app.toLowerCase()}`);
+  }
+
+  async invalidateApplication(appId: string, appCode: string, revoke = false) {
+    const rows = await this.prisma.userAppAccess.findMany({
+      where: { applicationId: appId },
+      select: { userId: true },
+    });
+    await Promise.all(
+      rows.flatMap(({ userId }) => [
+        this.invalidate(userId, appCode),
+        ...(revoke
+          ? [this.sessions.revokeUserAppSessions(userId, appCode.toLowerCase())]
+          : []),
+      ]),
+    );
   }
 
   async audit(

@@ -49,34 +49,37 @@ model AuthChallenge {
 }
 
 model User {
-  id                     String                  @id
-  email                  String                  @unique
-  password               String?
-  fullName               String?
-  avatar                 String?
-  avatarPublicId         String?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime
-  role                   String                  @default("USER")
-  googleId               String?                 @unique
-  typeAuth               authProvider            @default(EMAIL)
-  metadata               Json?
-  phone                  String?                 @unique
-  status                 UserStatus              @default(ACTIVE)
+  id                          String                  @id
+  email                       String                  @unique
+  password                    String?
+  fullName                    String?
+  avatar                      String?
+  avatarPublicId              String?
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime
+  role                        String                  @default("USER")
+  googleId                    String?                 @unique
+  typeAuth                    authProvider            @default(EMAIL)
+  metadata                    Json?
+  phone                       String?                 @unique
+  status                      UserStatus              @default(ACTIVE)
   // 2FA fields
-  twoFactorEnabled       Boolean                 @default(false)
-  twoFactorRequired      Boolean                 @default(false)
-  totpSecret             String?
-  twoFactorRecoveryCodes TwoFactorRecoveryCode[]
-  timelineEvents         TimelineEvent[]
-  externalIdentities     ExternalIdentity[]
-  applicationAccess      UserAppAccess[]         @relation("AccessUser")
-  accessGranted          UserAppAccess[]         @relation("AccessGrantor")
-  applicationRoles       UserAppRole[]
-  authAuditLogs          AuthAuditLog[]
-  memberships            UserMembership[]
-  membershipOverrides    MembershipOverride[] @relation("OverrideUser")
-  membershipOverridesGranted MembershipOverride[] @relation("OverrideGrantor")
+  twoFactorEnabled            Boolean                 @default(false)
+  twoFactorRequired           Boolean                 @default(false)
+  totpSecret                  String?
+  twoFactorRecoveryCodes      TwoFactorRecoveryCode[]
+  timelineEvents              TimelineEvent[]
+  externalIdentities          ExternalIdentity[]
+  applicationAccess           UserAppAccess[]         @relation("AccessUser")
+  accessGranted               UserAppAccess[]         @relation("AccessGrantor")
+  applicationRoles            UserAppRole[]           @relation("UserApplicationRoles")
+  applicationRolesAssigned    UserAppRole[]           @relation("UserApplicationRoleAssigner")
+  authAuditLogs               AuthAuditLog[]
+  memberships                 UserMembership[]
+  membershipOverrides         MembershipOverride[]    @relation("OverrideUser")
+  membershipOverridesGranted  MembershipOverride[]    @relation("OverrideGrantor")
+  managedApplications         ApplicationManager[]    @relation("ManagedApplications")
+  applicationManagersAssigned ApplicationManager[]    @relation("ApplicationManagerAssigner")
 
   @@index([status, createdAt(sort: Desc)])
   @@map("users")
@@ -216,11 +219,13 @@ model Application {
   status       ApplicationStatus        @default(ACTIVE)
   require2fa   Boolean                  @default(false)
   createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
   redirectUris ApplicationRedirectUri[]
   userAccess   UserAppAccess[]
   roles        AppRole[]
   permissions  Permission[]
   userAppRoles UserAppRole[]
+  managers     ApplicationManager[]
 
   @@map("applications")
 }
@@ -258,6 +263,10 @@ model AppRole {
   applicationId String
   code          String
   name          String?
+  description   String?
+  isSystem      Boolean          @default(false)
+  deprecated    Boolean          @default(false)
+  createdAt     DateTime         @default(now())
   application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   permissions   RolePermission[]
   users         UserAppRole[]
@@ -271,6 +280,8 @@ model Permission {
   applicationId String
   code          String
   description   String?
+  deprecated    Boolean          @default(false)
+  createdAt     DateTime         @default(now())
   application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   roles         RolePermission[]
 
@@ -292,13 +303,31 @@ model UserAppRole {
   userId        String
   applicationId String
   roleId        String
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy    String?
+  assignedAt    DateTime    @default(now())
+  user          User        @relation("UserApplicationRoles", fields: [userId], references: [id], onDelete: Cascade)
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   role          AppRole     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assigner      User?       @relation("UserApplicationRoleAssigner", fields: [assignedBy], references: [id], onDelete: SetNull)
 
   @@id([userId, applicationId, roleId])
   @@index([userId, applicationId])
   @@map("user_app_roles")
+}
+
+model ApplicationManager {
+  applicationId String
+  userId        String
+  managerRole   String      @default("MANAGER")
+  assignedBy    String?
+  assignedAt    DateTime    @default(now())
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user          User        @relation("ManagedApplications", fields: [userId], references: [id], onDelete: Cascade)
+  assigner      User?       @relation("ApplicationManagerAssigner", fields: [assignedBy], references: [id], onDelete: SetNull)
+
+  @@id([applicationId, userId])
+  @@index([userId])
+  @@map("application_managers")
 }
 
 model AuthAuditLog {

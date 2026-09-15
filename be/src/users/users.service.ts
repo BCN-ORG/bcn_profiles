@@ -18,6 +18,7 @@ import { EmailService } from '../auth/services/email.service';
 import { AuthSessionCacheService } from '../auth/services/auth-session-cache.service';
 import { UsersListCacheService } from './users-list-cache.service';
 import { MinioService } from '../common/storage/minio.service';
+import { RedisService } from '../redis/redis.service';
 
 export type UserWithoutPassword = Omit<
   User,
@@ -88,6 +89,7 @@ export class UsersService implements OnModuleInit {
     private readonly sessionCache: AuthSessionCacheService,
     private readonly listCache: UsersListCacheService,
     private readonly minioService: MinioService,
+    private readonly redis: RedisService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -664,6 +666,7 @@ export class UsersService implements OnModuleInit {
 
     await this.sessionCache.invalidateUser(id);
     await this.sessionCache.setRevokedBefore(id);
+    await this.redis.delByPrefix(`authz:${id}:`);
     await this.invalidateListCaches();
     return updatedUser;
   }

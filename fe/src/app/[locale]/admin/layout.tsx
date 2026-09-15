@@ -4,6 +4,7 @@ import { AccountShell } from '@/components/layout/account-shell';
 import { RequireAuth, useAuth } from '@/components/auth/auth-provider';
 import { useRouter } from '@/i18n/navigation';
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { isAdmin } from '@/lib/onboarding';
 
 export default function AdminLayout({
@@ -13,14 +14,16 @@ export default function AdminLayout({
 }) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const managerRoute = pathname.endsWith('/admin/rbac');
 
   useEffect(() => {
-    if (!isLoading && user && !isAdmin(user)) {
+    if (!isLoading && user && !isAdmin(user) && !managerRoute) {
       router.replace('/');
     }
-  }, [isLoading, user, router]);
+  }, [isLoading, user, router, managerRoute]);
 
-  if (!isLoading && user && !isAdmin(user)) {
+  if (!isLoading && user && !isAdmin(user) && !managerRoute) {
     return null;
   }
 

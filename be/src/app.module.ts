@@ -22,6 +22,7 @@ import { IdentityModule } from './identity/identity.module';
 import { OauthModule } from './oauth/oauth.module';
 import { ExternalIdentitiesModule } from './external-identities/external-identities.module';
 import { MembershipModule } from './membership/membership.module';
+import { ApplicationManagerGuard } from './authorization/application-manager.guard';
 
 @Module({
   imports: [
@@ -83,6 +84,10 @@ import { MembershipModule } from './membership/membership.module';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ApplicationManagerGuard,
     },
     {
       provide: APP_GUARD,

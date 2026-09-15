@@ -162,11 +162,7 @@ export class MembershipService {
   }
 
   async disconnectDiscord(userId: string, discordUserId?: string) {
-    return this.persistDiscordAndCompose(
-      userId,
-      discordUserId,
-      'NOT_MEMBER',
-    );
+    return this.persistDiscordAndCompose(userId, discordUserId, 'NOT_MEMBER');
   }
 
   async setOverride(
@@ -186,7 +182,10 @@ export class MembershipService {
       });
     }
     const expiresAt = new Date(input.expiresAt);
-    if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+    if (
+      Number.isNaN(expiresAt.getTime()) ||
+      expiresAt.getTime() <= Date.now()
+    ) {
       throw new BadRequestException({
         code: 'OVERRIDE_EXPIRY_INVALID',
         message: 'Override expiresAt must be a future timestamp',
@@ -243,7 +242,9 @@ export class MembershipService {
         return {
           discord: {
             status: existing.status,
-            checkedAt: (existing.lastCheckedAt ?? existing.expiresAt).toISOString(),
+            checkedAt: (
+              existing.lastCheckedAt ?? existing.expiresAt
+            ).toISOString(),
           },
           expiresAt: existing.expiresAt.toISOString(),
         };
@@ -347,6 +348,10 @@ export class MembershipService {
     };
     await this.redis.setJson(`membership:user:${userId}`, result, this.ttlMs);
 
+    if (previous && previous.eligible !== eligible) {
+      await this.redis.delByPrefix(`authz:${userId}:`);
+    }
+
     if (previous?.eligible && !eligible) {
       await this.sessions.revokeAllUserSessions(userId);
       await this.audit(userId, 'ALL_SESSIONS_REVOKED_MEMBERSHIP', {
@@ -388,9 +393,7 @@ export class MembershipService {
     sourceId?: string,
     metadata?: Prisma.InputJsonValue,
   ): Promise<MembershipResult> {
-    const source = sourceId
-      ? { id: sourceId }
-      : await this.getDiscordSource();
+    const source = sourceId ? { id: sourceId } : await this.getDiscordSource();
     const previous = await this.prisma.userMembership.findUnique({
       where: {
         userId_membershipSourceId: {

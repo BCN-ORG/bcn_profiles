@@ -38,6 +38,8 @@ import {
 } from '@/components/ui/sidebar';
 import { cn, initials } from '@/lib/utils';
 import { isAdmin } from '@/lib/onboarding';
+import { useQuery } from '@tanstack/react-query';
+import { rbacService } from '@/services';
 import type { LucideIcon } from 'lucide-react';
 
 type NavItem = { href: string; key: string; icon: LucideIcon };
@@ -67,10 +69,7 @@ function navActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function currentTitle(
-  pathname: string,
-  t: (key: string) => string,
-): string {
+function currentTitle(pathname: string, t: (key: string) => string): string {
   const all = [...mainLinks, ...securityLinks, ...adminLinks];
   const match = all.find((item) => navActive(pathname, item.href));
   return match ? t(match.key) : t('overview');
@@ -144,6 +143,11 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const pageTitle = currentTitle(pathname, t);
+  const managedApps = useQuery({
+    queryKey: ['admin', 'rbac', 'apps'],
+    queryFn: () => rbacService.listApps(),
+    enabled: Boolean(user),
+  });
 
   if (!user) return null;
 
@@ -197,12 +201,22 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
               pathname={pathname}
               t={t}
             />
+          ) : managedApps.data?.length ? (
+            <NavGroup
+              label={t('admin')}
+              items={[adminLinks[1]]}
+              pathname={pathname}
+              t={t}
+            />
           ) : null}
         </SidebarContent>
 
         <SidebarFooter className="border-t border-sidebar-border/60 p-3">
           <div className="flex items-center gap-2.5 rounded-2xl bg-muted/40 p-2 ring-1 ring-border/50 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1.5">
-            <Avatar size="sm" className="size-9 shrink-0 rounded-xl after:rounded-xl">
+            <Avatar
+              size="sm"
+              className="size-9 shrink-0 rounded-xl after:rounded-xl"
+            >
               {user.avatar ? (
                 <AvatarImage src={user.avatar} alt="" className="rounded-xl" />
               ) : null}

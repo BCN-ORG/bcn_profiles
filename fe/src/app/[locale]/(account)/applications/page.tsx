@@ -123,7 +123,7 @@ export default function ApplicationsPage() {
     queryFn: applicationService.mine,
   });
 
-  const apps = query.data ?? [];
+  const apps = useMemo(() => query.data ?? [], [query.data]);
   const stats = useMemo(() => {
     const active = apps.filter((a) => a.access === 'ACTIVE').length;
     const blocked = apps.filter((a) => a.access === 'BLOCKED').length;
@@ -155,10 +155,15 @@ export default function ApplicationsPage() {
             <Card key={key} size="sm" className="shadow-none">
               <CardContent className="flex items-center gap-3 pt-1">
                 <span className="flex size-9 items-center justify-center rounded-xl bg-muted">
-                  <AppWindow className="size-4 text-muted-foreground" aria-hidden />
+                  <AppWindow
+                    className="size-4 text-muted-foreground"
+                    aria-hidden
+                  />
                 </span>
                 <div>
-                  <p className="text-2xl font-semibold tracking-tight">{value}</p>
+                  <p className="text-2xl font-semibold tracking-tight">
+                    {value}
+                  </p>
                   <p className="text-xs text-muted-foreground">{title}</p>
                 </div>
               </CardContent>

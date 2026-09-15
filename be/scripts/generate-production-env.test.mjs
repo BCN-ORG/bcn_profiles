@@ -6,13 +6,18 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 function fixture() {
-  const namespace = JSON.parse(readFileSync('package.json')).name === 'bcn_profiles' ? 'profiles' : 'quizzes';
+  const namespace = 'profiles';
   const vars = {};
   for (const line of readFileSync('.env.example', 'utf8').split('\n')) {
-    const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
-    if (!match || line.endsWith('# optional')) continue;
+    const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*?)(?:\s+# optional(?:\s.*)?)?$/);
+    if (!match || /\s+# optional(?:\s.*)?$/.test(line)) continue;
     vars[match[1]] = match[2].replace(/^"|"$/g, '') || 'test-value';
   }
+  Object.assign(vars, {
+    DB_HOST: 'postgres',
+    REDIS_HOST: 'redis',
+    MINIO_ENDPOINT: 'https://storage.bcn.id.vn',
+  });
   const secrets = { DB_PASSWORD: "p@ss:%/#$'\\ word", REDIS_PASSWORD: "'redis${NOT_SET}#\\ password", MINIO_ACCESS_KEY: 'app-key', MINIO_SECRET_KEY: 'app-secret', JWT_SECRET: 'access-secret', JWT_REFRESH_SECRET: 'refresh-secret' };
   return { vars, secrets, PROJECT_NAME: namespace === 'profiles' ? 'bcn_profiles' : 'bcn_quiz' };
 }

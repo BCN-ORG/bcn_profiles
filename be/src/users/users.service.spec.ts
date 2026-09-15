@@ -63,6 +63,7 @@ describe('UsersService avatar behavior', () => {
       { invalidateUser: jest.fn() } as never,
       { invalidateAll: jest.fn() } as never,
       minio as never,
+      { delByPrefix: jest.fn() } as never,
     );
   });
 

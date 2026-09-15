@@ -75,10 +75,10 @@ export const authService = {
   recoveryRequest: (email: string) =>
     request.post('/auth/2fa/recovery/request', { email }),
   recoveryVerify: (email: string, recoveryOtp: string) =>
-    request.post<{ recoveryToken: string }>(
-      '/auth/2fa/recovery/verify-email',
-      { email, recoveryOtp },
-    ),
+    request.post<{ recoveryToken: string }>('/auth/2fa/recovery/verify-email', {
+      email,
+      recoveryOtp,
+    }),
   recoveryReset: (password: string, recoveryToken: string) =>
     request.post(
       '/auth/2fa/recovery/reset',
@@ -94,8 +94,7 @@ export const profileService = {
     avatar?: string | null;
     avatarPublicId?: string | null;
     metadata?: { onboardingVersion?: number };
-  }) =>
-    request.patch<{ users: User }>('/users/me', data).then((r) => r.users),
+  }) => request.patch<{ users: User }>('/users/me', data).then((r) => r.users),
   avatarSignature: () =>
     request.post<{
       uploadUrl: string;
@@ -153,9 +152,7 @@ export const applicationService = {
   block: (userId: string, app: string) =>
     request.post(`/admin/users/${userId}/applications/${app}/block`),
   listRoles: (userId: string, app: string) =>
-    request.get<string[]>(
-      `/admin/users/${userId}/applications/${app}/roles`,
-    ),
+    request.get<string[]>(`/admin/users/${userId}/applications/${app}/roles`),
   assignRole: (userId: string, app: string, role: string) =>
     request.post(`/admin/users/${userId}/applications/${app}/roles/${role}`),
   removeRole: (userId: string, app: string, role: string) =>
@@ -239,13 +236,28 @@ export type RbacApplication = {
   roles: {
     id: string;
     code: string;
-    name: string;
+    name: string | null;
+    description?: string | null;
+    deprecated?: boolean;
     permissions: {
       permission: { id: string; code: string; description?: string | null };
     }[];
   }[];
-  permissions: { id: string; code: string; description?: string | null }[];
+  permissions: {
+    id: string;
+    code: string;
+    description?: string | null;
+    deprecated?: boolean;
+  }[];
+  managers: RbacManager[];
   _count?: { userAccess: number; userAppRoles?: number };
+};
+
+export type RbacManager = {
+  userId: string;
+  managerRole: string;
+  assignedAt: string;
+  user: { id: string; email: string; fullName?: string | null };
 };
 
 export type RbacAppUser = {
@@ -253,6 +265,7 @@ export type RbacAppUser = {
   status: string;
   createdAt: string;
   user: { id: string; email: string; fullName: string; status: string };
+  roles: string[];
 };
 
 export const rbacService = {
@@ -299,8 +312,20 @@ export const rbacService = {
     request.delete(
       `/admin/applications/${code}/roles/${role}/permissions/${permission}`,
     ),
+  setRolePermissions: (code: string, role: string, permissions: string[]) =>
+    request.put(`/admin/applications/${code}/roles/${role}/permissions`, {
+      permissions,
+    }),
   listAppUsers: (code: string) =>
     request.get<RbacAppUser[]>(`/admin/applications/${code}/users`),
+  listManagers: (code: string) =>
+    request.get<RbacManager[]>(`/admin/applications/${code}/managers`),
+  addManager: (code: string, userId: string) =>
+    request.post(`/admin/applications/${code}/managers/${userId}`),
+  removeManager: (code: string, userId: string) =>
+    request.delete(`/admin/applications/${code}/managers/${userId}`),
+  importManifest: (content: string) =>
+    request.post<RbacApplication>('/admin/applications/import', { content }),
 };
 
 export const auditService = {
