@@ -1,0 +1,19 @@
+node_modules
+dist
+.env
+.env.*
+!.env.example
+logs
+data
+coverage
+.git
+.github
+.code-review-graph
+*.log
+.DS_Store
+test
+tools
+# Local PII seed data — never bake into images
+prisma/seed.ts
+prisma/seed-members.json
+prisma/danh-sach*.json

@@ -1,203 +1,53 @@
-# BCN Profiles API
+# BCN Profiles
 
-Backend API cho hệ thống quản lý hồ sơ học viên BCN, xác thực người dùng, phê duyệt tài khoản, và quản lý timeline sự kiện học tập.
+Repository gồm hai ứng dụng độc lập:
 
-## 1) Tổng quan dự án
+- `be/`: NestJS API (chạy trên máy host khi local).
+- `fe/`: Next.js Account Center (chạy trên máy host khi local).
 
-BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập trung vào:
-
-- Quản lý người dùng và trạng thái tài khoản (`PENDING`, `ACTIVE`, `BLOCKED`)
-- Xác thực Email/Password (+ 2FA khi được bật/bắt buộc)
-- Bảo mật phiên với JWT access/refresh (`type` + `jti`), rotate refresh, revoke khi logout
-- Hỗ trợ quy trình bảo mật nâng cao (OTP email, 2FA, mã khôi phục)
-- Quản lý timeline sự kiện học tập theo user
-
-## 2) Tính năng chính
-
-### Authentication & Authorization
-
-- Đăng ký, đăng nhập bằng Email/Password
-- JWT Access Token + Refresh Token (cookie HttpOnly)
-- RBAC theo vai trò (`USER`, `ADMIN`)
-- Quên mật khẩu bằng OTP qua email
-- Đổi email và xác minh email mới bằng OTP
-- 2FA (TOTP + email OTP + backup codes + recovery có password)
-
-### User Management
-
-- Quản lý hồ sơ người dùng
-- Admin duyệt/từ chối user mới
-- Tìm kiếm, lọc, phân trang danh sách người dùng
-- Quản lý trạng thái người dùng
-
-### Timeline Events
-
-- Quản lý sự kiện timeline theo user
-- Các loại sự kiện: `JOIN_BCN`, `COURSE_COMPLETE`, `QUIZ_COMPLETE`, `PROJECT_COMPLETE`, `SEMESTER_COMPLETE`
-- User tạo/sửa sự kiện của mình
-- Admin có quyền quản trị cao hơn trên dữ liệu timeline
-
-### Security
-
-- Rate limiting (throttle)
-- Token revocation (`jti` blacklist) khi logout / refresh rotate
-- Single-use 2FA challenge tokens
-- Validate input với `class-validator`
-- `helmet` cho HTTP security headers
-- Cookie parser và cơ chế bảo vệ endpoint theo guard/decorator
-
-## 3) Công nghệ sử dụng
-
-### Core
-
-- **Framework:** NestJS 11
-- **Language:** TypeScript 5
-- **Runtime:** Node.js
-
-### Database & ORM
-
-- **Database:** PostgreSQL
-- **ORM:** Prisma 7
-- **Prisma Client Generator:** `prisma-client` (output tại `prisma/client`)
-- **Migration:** Prisma Migrate
-
-### Authentication & Security
-
-- `@nestjs/jwt`, `passport`, `passport-jwt`, `passport-local`
-- `bcrypt` để hash password/recovery codes/OTP
-- `helmet`, `@nestjs/throttler`
-- **Redis** (`ioredis`) cho session/user/list/timeline cache + revoke hot path; key prefix `bcn:profiles:`
-
-### Validation & Data Handling
-
-- `class-validator`
-- `class-transformer`
-
-### Email & OTP
-
-- **Resend** (`resend` SDK) — OTP, approve/reject, 2FA
-- Template Handlebars trong module auth
-
-### Dev Tools
-
-- ESLint + Prettier
-- Jest (unit test + e2e)
-
-## 4) Cấu trúc thư mục chính
-
-```text
-src/
-  auth/                # Xác thực, phân quyền, OTP, 2FA
-  users/               # Quản lý user và hồ sơ
-  timeline-events/     # Timeline events theo user
-  prisma/              # Prisma module/service cho NestJS
-  redis/               # Redis client (cache + throttler)
-  common/              # Filters / interceptors / logging
-
-prisma/
-  schema.prisma        # Định nghĩa schema database
-  migrations/          # Lịch sử migration SQL
-  client/              # Prisma client generated code
-```
-
-## 5) Biến môi trường
-
-Tạo file `.env` từ `.env.example`:
+## 1) Docker — chỉ Postgres + Redis + MinIO
 
 ```bash
+cp .env.docker.example .env.docker
+docker compose --env-file .env.docker up -d
+```
+
+| Service  | Host URL / port                          |
+|----------|------------------------------------------|
+| Postgres | `localhost:5433` (db `profiles`)         |
+| Redis    | `localhost:6379`                         |
+| MinIO API | `http://127.0.0.1:9010`                 |
+| MinIO Console | `http://127.0.0.1:9011`             |
+| MinIO Admin | `http://127.0.0.1:9012`               |
+
+Lần đầu mở MinIO Console → tạo bucket tên `profiles`.
+
+## 2) Backend trên máy
+
+```bash
+cd be
 cp .env.example .env
-# Host dev: NODE_ENV=development, APP_PORT=3000 (Quiz: 3001),
-# DATABASE_URL=postgresql://postgres:postgres@localhost:5433/<local-db>?schema=public
-# REDIS_HOST=localhost, REDIS_PORT=6379, PROFILES_API_BASE_URL=http://localhost:3000
-# Fill MINIO_* for your development MinIO server when testing uploads.
-```
-
-Infra dùng chung (Postgres database `profiles` + Redis) — chạy từ workspace root hoặc `infra/`:
-
-```bash
-cd ..
-docker compose up -d
-# or: cd ../infra && docker compose up -d
-```
-
-Các biến quan trọng:
-
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5433/profiles?schema=public"
-REDIS_URL="redis://localhost:6379"
-REDIS_KEY_PREFIX="bcn:profiles:"
-JWT_SECRET="your-strong-jwt-secret"
-JWT_REFRESH_SECRET="your-strong-refresh-secret"
-RESEND_API_KEY="re_xxxxxxxxx"
-EMAIL_FROM="BCN Support <noreply@your-verified-domain.com>"
-NODE_ENV="development"
-PORT=3000
-```
-
-Sentinel / HA (optional): xem `../infra/docker-compose.redis-sentinel.yml`.
-
-Lỗi API trả về envelope thống nhất với success:
-
-```json
-{ "statusCode": 401, "message": "...", "error": "Unauthorized", "data": null }
-```
-
-## 6) Cài đặt và chạy dự án
-
-```bash
+# Điền local infra (xem block Local Docker trong .env.example)
 npm install
-```
-
-### Chạy migration local/dev
-
-```bash
-npx prisma migrate dev
-```
-
-### Deploy migration (staging/production)
-
-```bash
-npm run migrate:deploy
-```
-
-### Generate Prisma Client
-
-```bash
-npx prisma generate
-```
-
-### Chạy ứng dụng
-
-```bash
-# dev
+npx prisma migrate deploy
 npm run start:dev
-
-# production
-npm run start:prod
 ```
 
-## 7) Scripts quan trọng
+API: http://localhost:3000
 
-- `npm run build`: Build NestJS app
-- `npm run start:dev`: Chạy development mode
-- `npm run start:prod`: Chạy production mode
-- `npm run migrate:deploy`: Apply migration lên DB
-- `npm run test`: Unit tests
-- `npm run test:e2e`: E2E tests
-- `npm run lint`: Lint code
+## 3) Frontend trên máy
 
-## 8) Tài liệu liên quan
+```bash
+cd fe
+cp .env.example .env
+pnpm install
+pnpm dev -- -p 5173
+```
 
-- API docs chi tiết: [API_DOCS.md](./API_DOCS.md)
-- Hướng dẫn 2FA: [2FA_USAGE_GUIDE.md](./2FA_USAGE_GUIDE.md)
+FE: http://localhost:5173 · locales `/vi`, `/en`
 
-## 9) Ghi chú triển khai
+## Production
 
-- Luôn chạy migration bằng `migrate deploy` trên môi trường production.
-- Hạn chế dùng `prisma db push` trên production để tránh lệch lịch sử migration.
-- Đảm bảo secrets (`JWT_SECRET`, optional `TOTP_ENCRYPTION_KEY`, mail credentials) được quản lý qua biến môi trường an toàn.
-- FE integration: xem checklist + pseudo-code trong [API_DOCS.md](./API_DOCS.md) (Cookies & Tokens).
+Dùng `be/docker-compose.prod.yml` + network `bcn-infra` — xem `be/docs/DEPLOY.md`.
 
-## Production shared infrastructure
-
-Xem [DEPLOY.md](DEPLOY.md) cho PostgreSQL/Redis/MinIO dùng chung, GitHub Environment `production` và luồng upload MinIO mới.
+Không commit `.env`, `.env.docker`, `*.pem`, seed data user.

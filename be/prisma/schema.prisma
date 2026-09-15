@@ -1,0 +1,357 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "./client"
+  previewFeatures = ["relationJoins"]
+  moduleFormat    = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model PasswordReset {
+  id        String   @id
+  email     String
+  otp       String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+
+  @@index([email])
+  @@index([email, isUsed, createdAt(sort: Desc)])
+  @@index([email, otp, isUsed])
+  @@index([expiresAt])
+}
+
+model TokenBlacklist {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique // JWT jti
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+/// Single-use challenge tokens for 2FA setup / verify / recovery.
+model AuthChallenge {
+  id            String    @id // jti
+  userId        String
+  email         String
+  type          String // setup-2fa | verify-2fa | recovery-2fa
+  totpSecretEnc String? // encrypted TOTP secret (setup flow only)
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
+  @@map("auth_challenges")
+}
+
+model User {
+  id                     String                  @id
+  email                  String                  @unique
+  password               String?
+  fullName               String?
+  avatar                 String?
+  avatarPublicId         String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime
+  role                   String                  @default("USER")
+  googleId               String?                 @unique
+  typeAuth               authProvider            @default(EMAIL)
+  metadata               Json?
+  phone                  String?                 @unique
+  status                 UserStatus              @default(ACTIVE)
+  // 2FA fields
+  twoFactorEnabled       Boolean                 @default(false)
+  twoFactorRequired      Boolean                 @default(false)
+  totpSecret             String?
+  twoFactorRecoveryCodes TwoFactorRecoveryCode[]
+  timelineEvents         TimelineEvent[]
+  externalIdentities     ExternalIdentity[]
+  applicationAccess      UserAppAccess[]         @relation("AccessUser")
+  accessGranted          UserAppAccess[]         @relation("AccessGrantor")
+  applicationRoles       UserAppRole[]
+  authAuditLogs          AuthAuditLog[]
+  memberships            UserMembership[]
+  membershipOverrides    MembershipOverride[] @relation("OverrideUser")
+  membershipOverridesGranted MembershipOverride[] @relation("OverrideGrantor")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("users")
+}
+
+enum authProvider {
+  EMAIL
+  GOOGLE
+}
+
+// ACTIVE is the DB-level default so existing rows stay accessible after migration.
+// New registrations always receive PENDING explicitly in application code.
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+  DISABLED
+  DELETED
+}
+
+enum ApplicationStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AppAccessStatus {
+  ACTIVE
+  BLOCKED
+  PENDING
+}
+
+enum ExternalProvider {
+  GOOGLE
+  GITHUB
+  DISCORD
+  ZALO
+}
+
+enum MembershipStatus {
+  VERIFIED
+  NOT_MEMBER
+  PENDING
+  STALE
+  UNKNOWN
+}
+
+enum MembershipVerificationMethod {
+  PROVIDER_API
+  ADMIN
+  SYNC
+}
+
+enum MembershipOverrideStatus {
+  ALLOW
+  DENY
+}
+
+model ExternalIdentity {
+  id                    String           @id
+  userId                String
+  provider              ExternalProvider
+  providerSubject       String
+  providerEmail         String?
+  providerUsername      String?
+  providerDisplayName   String?
+  providerAvatarUrl     String?
+  profileData           Json?
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  linkedAt              DateTime         @default(now())
+  lastLoginAt           DateTime?
+  lastSyncedAt          DateTime?
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("external_identities")
+}
+
+model MembershipSource {
+  id              String           @id
+  provider        ExternalProvider
+  code            String           @unique
+  name            String
+  externalGroupId String
+  enabled         Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  memberships     UserMembership[]
+
+  @@map("membership_sources")
+}
+
+model UserMembership {
+  id                 String                        @id
+  userId             String
+  membershipSourceId String
+  providerSubject    String?
+  status             MembershipStatus
+  verificationMethod MembershipVerificationMethod?
+  verifiedAt         DateTime?
+  expiresAt          DateTime?
+  lastCheckedAt      DateTime?
+  metadata           Json?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+  user               User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membershipSource   MembershipSource              @relation(fields: [membershipSourceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, membershipSourceId])
+  @@index([status, expiresAt])
+  @@map("user_memberships")
+}
+
+model MembershipOverride {
+  id        String                   @id
+  userId    String
+  status    MembershipOverrideStatus
+  reason    String
+  expiresAt DateTime
+  grantedBy String
+  createdAt DateTime                 @default(now())
+  user      User                     @relation("OverrideUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantor   User                     @relation("OverrideGrantor", fields: [grantedBy], references: [id], onDelete: Restrict)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@map("membership_overrides")
+}
+
+model Application {
+  id           String                   @id
+  code         String                   @unique
+  name         String
+  clientId     String                   @unique
+  status       ApplicationStatus        @default(ACTIVE)
+  require2fa   Boolean                  @default(false)
+  createdAt    DateTime                 @default(now())
+  redirectUris ApplicationRedirectUri[]
+  userAccess   UserAppAccess[]
+  roles        AppRole[]
+  permissions  Permission[]
+  userAppRoles UserAppRole[]
+
+  @@map("applications")
+}
+
+model ApplicationRedirectUri {
+  id            String      @id
+  applicationId String
+  redirectUri   String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, redirectUri])
+  @@map("application_redirect_uris")
+}
+
+model UserAppAccess {
+  id            String          @id
+  userId        String
+  applicationId String
+  status        AppAccessStatus @default(ACTIVE)
+  grantedBy     String?
+  grantedAt     DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime        @default(now())
+  user          User            @relation("AccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  application   Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  grantor       User?           @relation("AccessGrantor", fields: [grantedBy], references: [id], onDelete: SetNull)
+
+  @@unique([userId, applicationId])
+  @@index([applicationId, status])
+  @@map("user_app_access")
+}
+
+model AppRole {
+  id            String           @id
+  applicationId String
+  code          String
+  name          String?
+  application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  permissions   RolePermission[]
+  users         UserAppRole[]
+
+  @@unique([applicationId, code])
+  @@map("roles")
+}
+
+model Permission {
+  id            String           @id
+  applicationId String
+  code          String
+  description   String?
+  application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  roles         RolePermission[]
+
+  @@unique([applicationId, code])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         AppRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserAppRole {
+  userId        String
+  applicationId String
+  roleId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  role          AppRole     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, applicationId, roleId])
+  @@index([userId, applicationId])
+  @@map("user_app_roles")
+}
+
+model AuthAuditLog {
+  id              String            @id
+  userId          String?
+  eventType       String
+  applicationCode String?
+  provider        ExternalProvider?
+  ipAddress       String?
+  userAgent       String?
+  metadata        Json?
+  createdAt       DateTime          @default(now())
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([eventType, createdAt(sort: Desc)])
+  @@map("auth_audit_logs")
+}
+
+model TwoFactorRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  code      String // hashed recovery code
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isUsed])
+  @@map("two_factor_recovery_codes")
+}
+
+model TimelineEvent {
+  id        Int       @id @default(autoincrement())
+  userUuid  String    @map("user_uuid")
+  eventType EventType @map("event_type")
+  title     String
+  metadata  Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userUuid], references: [id], onDelete: Cascade)
+
+  @@index([userUuid])
+  @@index([userUuid, createdAt(sort: Desc)])
+  @@map("timeline_events")
+}
+
+enum EventType {
+  JOIN_BCN
+  COURSE_COMPLETE
+  QUIZ_COMPLETE
+  PROJECT_COMPLETE
+  SEMESTER_COMPLETE
+}

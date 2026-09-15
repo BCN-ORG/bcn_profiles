@@ -1,0 +1,22 @@
+# Backend local artifacts
+node_modules/
+dist/
+coverage/
+logs/
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.tsbuildinfo
+
+# Prisma generated client
+prisma/client/
+
+# Seed & member PII (keep local only)
+prisma/seed.ts
+prisma/seed-members.json
+prisma/danh-sach*.json
+prisma/*.json
+!prisma/seed.example.ts

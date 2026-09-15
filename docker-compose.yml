@@ -1,0 +1,75 @@
+# Local infrastructure only — run BE/FE on the host.
+#
+#   cp .env.docker.example .env.docker
+#   docker compose --env-file .env.docker up -d
+#
+# Then in be/:
+#   DATABASE_URL=postgresql://postgres:postgres@localhost:5433/profiles?schema=public
+#   REDIS_URL=redis://localhost:6379
+#   MINIO_ENDPOINT=http://127.0.0.1:9010
+#   MINIO_ACCESS_KEY / MINIO_SECRET_KEY from .env.docker
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: bcn_profiles_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-profiles}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    ports:
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - profiles_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-profiles}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: bcn_profiles_redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - profiles_redis_data:/data
+    command: ['redis-server', '--appendonly', 'yes']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: firstfinger/minio:latest-amd64
+    platform: linux/amd64
+    container_name: bcn_profiles_minio
+    restart: unless-stopped
+    ports:
+      - '${MINIO_API_PORT:-9010}:9000'
+      - '${MINIO_CONSOLE_PORT:-9011}:9001'
+      - '${MINIO_ADMIN_PORT:-9012}:9002'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - profiles_minio_data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  profiles_pg_data:
+  profiles_redis_data:
+  profiles_minio_data:

@@ -1,63 +1,74 @@
-# compiled output
-/dist
-/node_modules
-/build
+# Dependencies
+**/node_modules/
+.pnpm-store/
+**/.pnpm-store/
 
-# Logs
-logs
+# Compiled / build output
+**/dist/
+**/build/
+**/.next/
+**/out/
+**/.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma generated client (run: npx prisma generate)
+**/prisma/client/
+/generated/prisma/
+
+# Logs & coverage
+**/logs/
 *.log
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+**/coverage/
+.nyc_output/
 
-# OS
+# Environment & secrets
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.docker.example
+**/secrets/
+*.pem
+*.key
+
+# OS / IDE
 .DS_Store
-
-# Tests
-/coverage
-/.nyc_output
-
-# IDEs and editors
-/.idea
+.idea/
 .project
 .classpath
 .c9/
 *.launch
 .settings/
 *.sublime-workspace
-
-# IDE - VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+.code-review-graph/
 
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production
-.env.local
-
-# temp directory
-.temp
-.tmp
-
-# Runtime data
-pids
+# Temp / runtime
+.temp/
+.tmp/
+pids/
 *.pid
 *.seed
 *.pid.lock
-
-# Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-/generated/prisma
+# Local seed data & PII (do not commit)
+**/prisma/seed.ts
+**/prisma/seed-members.json
+**/prisma/danh-sach*.json
+**/prisma/*.json
+!**/prisma/migrations/**/*.json
+!**/prisma/seed.example.ts
 
-/generated/prisma
-
-.env.*
-!.env.example
+# Test / tool artifacts
+**/playwright-report/
+**/test-results/

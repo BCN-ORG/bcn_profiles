@@ -1,0 +1,12 @@
+# BCN Account Center frontend
+.next/
+out/
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
