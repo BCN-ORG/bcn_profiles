@@ -24,6 +24,30 @@ services:
       start_period: 30s
     stop_grace_period: 20s
 
+  web:
+    image: ${FE_IMAGE_NAME:?FE_IMAGE_NAME is required}:${FE_IMAGE_TAG:?FE_IMAGE_TAG is required}
+    container_name: bcn_profiles_web
+    restart: unless-stopped
+    environment:
+      PORT: ${FE_APP_PORT:?FE_APP_PORT is required}
+      HOSTNAME: 0.0.0.0
+    ports:
+      - '127.0.0.1:${FE_HOST_PORT:?FE_HOST_PORT is required}:${FE_APP_PORT:?FE_APP_PORT is required}'
+    networks:
+      - bcn-infra
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:' + (process.env.PORT || '3000') + '/vi').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+    stop_grace_period: 20s
+
 networks:
   bcn-infra:
     external: true

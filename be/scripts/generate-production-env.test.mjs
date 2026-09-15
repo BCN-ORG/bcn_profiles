@@ -17,13 +17,19 @@ function fixture() {
     DB_HOST: 'postgres',
     REDIS_HOST: 'redis',
     MINIO_ENDPOINT: 'https://storage.bcn.id.vn',
+    GOOGLE_REDIRECT_URI: 'https://profiles.bcn.id.vn/api/auth/social/google/callback',
+    OAUTH_GITHUB_REDIRECT_URI:
+      'https://profiles.bcn.id.vn/api/auth/social/github/callback',
+    DISCORD_REDIRECT_URI:
+      'https://profiles.bcn.id.vn/api/auth/social/discord/callback',
+    ZALO_REDIRECT_URI: 'https://profiles.bcn.id.vn/api/auth/social/zalo/callback',
   });
   const secrets = { DB_PASSWORD: "p@ss:%/#$'\\ word", REDIS_PASSWORD: "'redis${NOT_SET}#\\ password", MINIO_ACCESS_KEY: 'app-key', MINIO_SECRET_KEY: 'app-secret', JWT_SECRET: 'access-secret', JWT_REFRESH_SECRET: 'refresh-secret' };
   return { vars, secrets, PROJECT_NAME: namespace === 'profiles' ? 'bcn_profiles' : 'bcn_quiz' };
 }
 
 function generate(root, config) {
-  return spawnSync(process.execPath, ['scripts/generate-production-env.mjs', join(root, '.env')], { encoding: 'utf8', env: { ...process.env, PROJECT_NAME: config.PROJECT_NAME, IMAGE_NAME: 'example/app', GITHUB_SHA: 'test-sha', PRODUCTION_VARS: JSON.stringify(config.vars), PRODUCTION_SECRETS: JSON.stringify(config.secrets) } });
+  return spawnSync(process.execPath, ['scripts/generate-production-env.mjs', join(root, '.env')], { encoding: 'utf8', env: { ...process.env, PROJECT_NAME: config.PROJECT_NAME, IMAGE_NAME: 'example/app', FE_IMAGE_NAME: 'example/web', GITHUB_SHA: 'test-sha', PRODUCTION_VARS: JSON.stringify(config.vars), PRODUCTION_SECRETS: JSON.stringify(config.secrets) } });
 }
 
 test('production env survives Compose parsing and URL-encodes special passwords', () => {
@@ -41,7 +47,7 @@ test('production env survives Compose parsing and URL-encodes special passwords'
     assert.equal(decodeURIComponent(new URL(environment.DATABASE_URL).password), config.secrets.DB_PASSWORD);
     assert.equal(environment.MINIO_SECRET_KEY, 'app-secret');
     const parsed = JSON.parse(compose.stdout);
-    assert.deepEqual(Object.keys(parsed.services), ['app']);
+    assert.deepEqual(Object.keys(parsed.services).sort(), ['app', 'web']);
     assert.equal(parsed.networks['bcn-infra'].external, true);
     assert.equal(parsed.services.app.ports[0].host_ip, '127.0.0.1');
     assert.equal(parsed.services.app.depends_on, undefined);

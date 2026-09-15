@@ -94,6 +94,73 @@ export class MinioService implements OnModuleInit {
       this.logger.log(`Created MinIO bucket "${this.bucket}"`);
     }
     await this.ensureAvatarPublicReadPolicy(client);
+    try {
+      await this.ensureBrowserCors(client);
+    } catch (error) {
+      this.logger.warn(
+        `MinIO CORS update skipped: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async ensureBrowserCors(client: Client): Promise<void> {
+    const origins = new Set<string>([
+      'https://profiles.bcn.id.vn',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://localhost:3001',
+      'http://127.0.0.1:3001',
+    ]);
+    for (const origin of (process.env.CORS_ORIGINS ?? '').split(',')) {
+      const value = origin.trim();
+      if (value) origins.add(value);
+    }
+    const frontend = process.env.FRONTEND_URL?.trim();
+    if (frontend) {
+      try {
+        origins.add(new URL(frontend).origin);
+      } catch {
+        /* ignore invalid FRONTEND_URL */
+      }
+    }
+    const allowedOrigins = [...origins]
+      .map(
+        (origin) =>
+          `    <AllowedOrigin>${escapeXml(origin)}</AllowedOrigin>`,
+      )
+      .join('\n');
+    const corsXml = `<?xml version="1.0" encoding="UTF-8"?>
+<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <CORSRule>
+${allowedOrigins}
+    <AllowedMethod>GET</AllowedMethod>
+    <AllowedMethod>HEAD</AllowedMethod>
+    <AllowedMethod>PUT</AllowedMethod>
+    <AllowedHeader>*</AllowedHeader>
+    <ExposeHeader>ETag</ExposeHeader>
+    <ExposeHeader>Content-Length</ExposeHeader>
+    <MaxAgeSeconds>3600</MaxAgeSeconds>
+  </CORSRule>
+</CORSConfiguration>`;
+    // minio@8 has no setBucketCors; use the same low-level request as setBucketPolicy.
+    await (
+      client as Client & {
+        makeRequestAsyncOmit: (
+          opts: Record<string, unknown>,
+          body: string,
+          statusCodes: number[],
+          region: string,
+        ) => Promise<unknown>;
+      }
+    ).makeRequestAsyncOmit(
+      { method: 'PUT', bucketName: this.bucket, query: 'cors' },
+      corsXml,
+      [200],
+      '',
+    );
+    this.logger.log(
+      `Applied MinIO CORS for ${origins.size} origin(s) on bucket "${this.bucket}"`,
+    );
   }
 
   private async ensureAvatarPublicReadPolicy(client: Client): Promise<void> {
@@ -272,4 +339,13 @@ export class MinioService implements OnModuleInit {
   async deleteImage(key: string): Promise<void> {
     await this.deleteRawFile(key);
   }
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }

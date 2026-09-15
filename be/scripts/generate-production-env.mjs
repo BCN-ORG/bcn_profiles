@@ -57,13 +57,23 @@ if (
   publicUrl.password
 )
   throw new Error('MINIO_ENDPOINT must be an HTTPS origin');
-for (const key of ['APP_PORT', 'HOST_PORT']) {
+for (const key of ['APP_PORT', 'HOST_PORT', 'FE_APP_PORT', 'FE_HOST_PORT']) {
   if (
     !/^\d+$/.test(values[key]) ||
     Number(values[key]) < 1 ||
     Number(values[key]) > 65535
   )
     throw new Error(`Invalid ${key}`);
+}
+for (const key of [
+  'GOOGLE_REDIRECT_URI',
+  'OAUTH_GITHUB_REDIRECT_URI',
+  'DISCORD_REDIRECT_URI',
+  'ZALO_REDIRECT_URI',
+]) {
+  if (values[key] && !values[key].includes('/api/auth/social/')) {
+    throw new Error(`${key} must include /api/auth/social/`);
+  }
 }
 if (values.JWT_SECRET && values.JWT_SECRET === values.JWT_REFRESH_SECRET)
   throw new Error('JWT secrets must be different');
@@ -82,6 +92,10 @@ Object.assign(values, {
   IMAGE_NAME: process.env.IMAGE_NAME,
   IMAGE_TAG: process.env.GITHUB_SHA,
   APP_VERSION: process.env.GITHUB_SHA,
+  FE_IMAGE_NAME: process.env.FE_IMAGE_NAME,
+  FE_IMAGE_TAG: process.env.GITHUB_SHA,
+  FE_APP_PORT: values.FE_APP_PORT || '3000',
+  FE_HOST_PORT: values.FE_HOST_PORT || '18087',
 });
 // Compose raw env_file values preserve secrets without interpolation or quoting.
 const output = Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n') + '\n';
@@ -95,5 +109,18 @@ renameSync(`${target}.tmp`, target);
 console.log('Production environment validated and generated');
 
 // Keep interpolation config separate so Compose never parses secrets as dotenv syntax.
-const composeValues = ['IMAGE_NAME', 'IMAGE_TAG', 'HOST_PORT', 'APP_PORT'];
-writeFileSync(`${target}.compose`, composeValues.map(key => `${key}=${values[key]}`).join('\n') + '\n', { mode: 0o600 });
+const composeValues = [
+  'IMAGE_NAME',
+  'IMAGE_TAG',
+  'HOST_PORT',
+  'APP_PORT',
+  'FE_IMAGE_NAME',
+  'FE_IMAGE_TAG',
+  'FE_HOST_PORT',
+  'FE_APP_PORT',
+];
+writeFileSync(
+  `${target}.compose`,
+  composeValues.map((key) => `${key}=${values[key]}`).join('\n') + '\n',
+  { mode: 0o600 },
+);
