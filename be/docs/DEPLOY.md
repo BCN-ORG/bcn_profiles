@@ -10,7 +10,7 @@ Tạo Environment **production** ở mỗi repository. Những key không có `#
 |---|---|---|---|---|---|---|---|
 | bcn_profiles | profiles | profiles_app | profiles | profiles: | 3000 | 18085 | FE_HOST_PORT=18087 |
 
-Nginx: `/api/` → `127.0.0.1:18085`, `/` → `127.0.0.1:18087`. Sample vhost: `deploy/nginx/profiles.bcn.id.vn.conf`. OAuth console redirects: [OAUTH_PROVIDER_CONSOLE.md](./OAUTH_PROVIDER_CONSOLE.md).
+Nginx (managed on server): `/api/` → `127.0.0.1:18085`, `/` → `127.0.0.1:18087`. OAuth console redirects: [OAUTH_PROVIDER_CONSOLE.md](./OAUTH_PROVIDER_CONSOLE.md).
 
 Variables: `APP_PORT`, `HOST_PORT`, `DB_HOST=postgres`, `DB_PORT=5432`, `DB_DATABASE`, `DB_USERNAME`, `DB_SCHEMA=public`, `REDIS_HOST=redis`, `REDIS_PORT=6379`, `REDIS_PREFIX`, `MINIO_ENDPOINT=https://storage.bcn.id.vn`, `MINIO_BUCKET`, `MINIO_FORCE_PATH_STYLE=true`. Public endpoint phải là origin HTTPS không có subpath; reverse proxy giữ nguyên Host và path để chữ ký hợp lệ. Nếu dùng region khác mặc định, cấu hình `MINIO_REGION`.
 

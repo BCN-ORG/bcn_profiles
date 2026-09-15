@@ -175,7 +175,6 @@ jobs:
           cp "$RUNNER_TEMP/production.env.compose" "$PROJECT_DIR/.env.compose"
           chmod 600 "$PROJECT_DIR/.env" "$PROJECT_DIR/.env.compose"
           cp docker-compose.prod.yml "$PROJECT_DIR/docker-compose.yml"
-          cp ../deploy/nginx/profiles.bcn.id.vn.conf "$PROJECT_DIR/nginx.profiles.bcn.id.vn.conf"
           cd "$PROJECT_DIR"
           docker compose --env-file .env.compose config --quiet
 
@@ -197,26 +196,6 @@ jobs:
           set -eu
           cd "$PROJECT_DIR"
           docker compose --env-file .env.compose up -d app web
-
-      - name: Install nginx vhost when permitted
-        run: |
-          set -eu
-          conf="$PROJECT_DIR/nginx.profiles.bcn.id.vn.conf"
-          target="/etc/nginx/sites-available/profiles.bcn.id.vn.conf"
-          if [ -d /etc/nginx/sites-available ] && command -v sudo >/dev/null && sudo -n true 2>/dev/null; then
-            sudo cp "$conf" "$target"
-            sudo ln -sfn "$target" /etc/nginx/sites-enabled/profiles.bcn.id.vn.conf
-            if sudo nginx -t; then
-              sudo systemctl reload nginx
-              echo "Nginx vhost installed and reloaded"
-            else
-              echo "nginx -t failed; left previous config in place" >&2
-              exit 1
-            fi
-          else
-            echo "Skip nginx install (no passwordless sudo). Copy manually:"
-            echo "  sudo cp $conf $target && sudo ln -sfn $target /etc/nginx/sites-enabled/ && sudo nginx -t && sudo systemctl reload nginx"
-          fi
 
       - name: Health check
         id: health
