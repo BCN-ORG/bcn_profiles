@@ -21,6 +21,7 @@ import {
 const OPTIONAL = [
   { id: 'GOOGLE', label: 'Google' },
   { id: 'GITHUB', label: 'GitHub' },
+  { id: 'ZALO', label: 'Zalo' },
 ] as const;
 
 export default function WelcomeOptionalPage() {

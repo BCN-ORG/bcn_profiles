@@ -204,10 +204,9 @@
   },
   "connections": {
     "title": "Tài khoản liên kết",
-    "subtitle": "Liên kết Google, GitHub, Discord để đăng nhập và xác minh membership.",
+    "subtitle": "Liên kết Google, GitHub, Discord hoặc Zalo để đăng nhập và xác minh membership.",
     "notLinked": "Chưa liên kết",
-    "oauthUnavailable": "{provider} chưa sẵn sàng trên môi trường này.",
-    "zaloSoon": "Sẽ được hỗ trợ sau khi xác minh domain."
+    "oauthUnavailable": "{provider} chưa sẵn sàng trên môi trường này."
   },
   "membership": {
     "title": "Membership",

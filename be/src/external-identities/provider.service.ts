@@ -1,4 +1,5 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import type { ExternalProvider } from 'prisma/client/enums';
 
@@ -32,7 +33,11 @@ type TokenResponse = {
 export class ExternalProviderService {
   constructor(private readonly config: ConfigService) {}
 
-  authorizationUrl(provider: ExternalProvider, state: string): string {
+  authorizationUrl(
+    provider: ExternalProvider,
+    state: string,
+    codeVerifier?: string,
+  ): string {
     const value = this.providerConfig(provider);
     const url = new URL(value.authorizeUrl);
     url.searchParams.set(
@@ -40,13 +45,26 @@ export class ExternalProviderService {
       value.clientId,
     );
     url.searchParams.set('redirect_uri', value.redirectUri);
+    url.searchParams.set('state', state);
+    if (provider === 'ZALO') {
+      if (codeVerifier) {
+        url.searchParams.set(
+          'code_challenge',
+          createHash('sha256').update(codeVerifier).digest('base64url'),
+        );
+      }
+      return url.toString();
+    }
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('scope', value.scope);
-    url.searchParams.set('state', state);
     return url.toString();
   }
 
-  async exchange(provider: ExternalProvider, code: string) {
+  async exchange(
+    provider: ExternalProvider,
+    code: string,
+    codeVerifier?: string,
+  ) {
     const value = this.providerConfig(provider);
     const response = await fetch(value.tokenUrl, {
       method: 'POST',
@@ -57,7 +75,12 @@ export class ExternalProviderService {
       },
       body: new URLSearchParams(
         provider === 'ZALO'
-          ? { app_id: value.clientId, grant_type: 'authorization_code', code }
+          ? {
+              app_id: value.clientId,
+              grant_type: 'authorization_code',
+              code,
+              ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+            }
           : {
               client_id: value.clientId,
               client_secret: value.clientSecret,

@@ -18,6 +18,7 @@ type OAuthState = {
   flow: 'link' | 'login';
   provider: ExternalProvider;
   userId?: string;
+  codeVerifier?: string;
 };
 
 @Injectable()
@@ -60,13 +61,19 @@ export class ExternalIdentitiesService {
         });
     }
     const state = randomBytes(32).toString('base64url');
+    const codeVerifier =
+      provider === 'ZALO' ? this.zaloCodeVerifier() : undefined;
     await this.redis.setJson(
       `oauth_state:${this.hash(state)}`,
-      { flow, provider, userId } satisfies OAuthState,
+      { flow, provider, userId, codeVerifier } satisfies OAuthState,
       10 * 60 * 1000,
     );
     return {
-      authorizationUrl: this.providers.authorizationUrl(provider, state),
+      authorizationUrl: this.providers.authorizationUrl(
+        provider,
+        state,
+        codeVerifier,
+      ),
     };
   }
 
@@ -96,7 +103,11 @@ export class ExternalIdentitiesService {
         code: 'OAUTH_STATE_INVALID',
         message: 'OAuth provider mismatch',
       });
-    const token = await this.providers.exchange(provider, code);
+    const token = await this.providers.exchange(
+      provider,
+      code,
+      saved.codeVerifier,
+    );
     const identity = await this.providers.identity(
       provider,
       token.access_token,
@@ -259,5 +270,11 @@ export class ExternalIdentitiesService {
 
   private hash(value: string) {
     return createHash('sha256').update(value).digest('base64url');
+  }
+
+  private zaloCodeVerifier(): string {
+    const alphabet =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    return Array.from(randomBytes(43), (byte) => alphabet[byte % 62]).join('');
   }
 }

@@ -25,7 +25,9 @@ describe('ExternalIdentitiesService', () => {
       },
     };
     const providers = {
-      authorizationUrl: jest.fn((_provider: string, state: string) => state),
+      authorizationUrl: jest.fn(
+        (_provider: string, state: string, _verifier?: string) => state,
+      ),
       exchange: jest.fn().mockResolvedValue({ access_token: 'provider-token' }),
       identity: jest.fn().mockResolvedValue({
         provider: 'GOOGLE',
@@ -87,5 +89,24 @@ describe('ExternalIdentitiesService', () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'OAUTH_STATE_INVALID' }),
     });
+  });
+
+  it('sends a Zalo PKCE verifier with the authorization URL and token exchange', async () => {
+    const service = createService(jest.fn().mockResolvedValue(null));
+    const { authorizationUrl: state } = await service.begin('zalo', 'login');
+    const providers = (service as any).providers as {
+      authorizationUrl: jest.Mock;
+      exchange: jest.Mock;
+    };
+    const verifier = providers.authorizationUrl.mock.calls[0][2] as string;
+    expect(verifier).toMatch(/^[A-Za-z0-9]{43}$/);
+    await expect(
+      service.callback('zalo', state, 'provider-code'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(providers.exchange).toHaveBeenCalledWith(
+      'ZALO',
+      'provider-code',
+      verifier,
+    );
   });
 });

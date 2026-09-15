@@ -19,13 +19,14 @@ import {
 } from '@/components/ui/card';
 
 const providers: {
-  id: 'GOOGLE' | 'GITHUB' | 'DISCORD';
+  id: 'GOOGLE' | 'GITHUB' | 'DISCORD' | 'ZALO';
   name: string;
   icon: SocialProvider;
 }[] = [
   { id: 'GOOGLE', name: 'Google', icon: 'google' },
   { id: 'GITHUB', name: 'GitHub', icon: 'github' },
   { id: 'DISCORD', name: 'Discord', icon: 'discord' },
+  { id: 'ZALO', name: 'Zalo', icon: 'zalo' },
 ];
 
 function oauthErrorMessage(
@@ -145,20 +146,6 @@ export default function ConnectionsPage() {
             </Card>
           );
         })}
-        <Card>
-          <CardHeader className="flex-row items-start gap-3 space-y-0">
-            <SocialIconBadge provider="zalo" />
-            <div className="min-w-0 flex-1">
-              <CardTitle>Zalo</CardTitle>
-              <p className="text-sm text-muted-foreground">{t('zaloSoon')}</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button className="w-full" variant="secondary" disabled>
-              {tc('comingSoon')}
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </PageShell>
   );

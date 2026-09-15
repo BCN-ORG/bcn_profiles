@@ -204,10 +204,9 @@
   },
   "connections": {
     "title": "Connected accounts",
-    "subtitle": "Link Google, GitHub, or Discord for sign-in and membership checks.",
+    "subtitle": "Link Google, GitHub, Discord, or Zalo for sign-in and membership checks.",
     "notLinked": "Not connected",
-    "oauthUnavailable": "{provider} isn’t available in this environment.",
-    "zaloSoon": "Available after domain verification."
+    "oauthUnavailable": "{provider} isn’t available in this environment."
   },
   "membership": {
     "title": "Membership",

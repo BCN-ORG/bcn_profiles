@@ -85,7 +85,7 @@ export default function LoginPage() {
   }
 
   async function startSocial(
-    provider: 'google' | 'github' | 'discord',
+    provider: 'google' | 'github' | 'discord' | 'zalo',
     label: string,
   ) {
     try {
@@ -325,12 +325,13 @@ export default function LoginPage() {
               ]}
             />
             <AuthDivider label={t('social')} />
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {(
                 [
                   ['google', 'Google'],
                   ['github', 'GitHub'],
                   ['discord', 'Discord'],
+                  ['zalo', 'Zalo'],
                 ] as const
               ).map(([provider, label]) => (
                 <Button
