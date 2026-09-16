@@ -2,7 +2,13 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { createContext, useContext, useEffect, type ReactNode } from 'react';
+import {
+  createContext,
+  Suspense,
+  useContext,
+  useEffect,
+  type ReactNode,
+} from 'react';
 import { useSearchParams } from 'next/navigation';
 import { authService } from '@/services';
 import type { User } from '@/types';
@@ -108,7 +114,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export function LocaleSwitcher() {
+function LocaleSwitcherButtons() {
   const locale = useLocale();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -134,5 +140,17 @@ export function LocaleSwitcher() {
         </Button>
       ))}
     </div>
+  );
+}
+
+export function LocaleSwitcher() {
+  return (
+    <Suspense
+      fallback={
+        <div className="inline-flex h-7 w-16 items-center gap-0.5" aria-hidden />
+      }
+    >
+      <LocaleSwitcherButtons />
+    </Suspense>
   );
 }
