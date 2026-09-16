@@ -610,33 +610,33 @@ export default function AdminRbacPage() {
             </section>
 
             <Tabs defaultValue="access" className="min-w-0">
-              <TabsList className="flex w-full flex-wrap justify-start gap-1 rounded-xl border border-border bg-muted/50 p-1.5 group-data-[orientation=horizontal]/tabs:h-auto">
-                <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="access">
+              <TabsList className="h-auto min-h-9 w-full flex-wrap justify-start">
+                <TabsTrigger className="flex-none px-2.5" value="access">
                   <Shield className="size-4" aria-hidden />
-                  <span className="whitespace-normal">{t('tabAccess')}</span>
+                  {t('tabAccess')}
                 </TabsTrigger>
-                <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="users">
+                <TabsTrigger className="flex-none px-2.5" value="users">
                   <Users className="size-4" aria-hidden />
-                  <span className="whitespace-normal">{t('tabUsers')}</span>
+                  {t('tabUsers')}
                 </TabsTrigger>
-                <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="uris">
+                <TabsTrigger className="flex-none px-2.5" value="uris">
                   <Link2 className="size-4" aria-hidden />
-                  <span className="whitespace-normal">{t('tabUris')}</span>
+                  {t('tabUris')}
                 </TabsTrigger>
                 {platformAdmin ? (
-                  <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="keys">
+                  <TabsTrigger className="flex-none px-2.5" value="keys">
                     <KeyRound className="size-4" aria-hidden />
-                    <span className="whitespace-normal">{t('tabKeys')}</span>
+                    {t('tabKeys')}
                   </TabsTrigger>
                 ) : null}
-                <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="managers">
+                <TabsTrigger className="flex-none px-2.5" value="managers">
                   <UserCog className="size-4" aria-hidden />
-                  <span className="whitespace-normal">{t('tabManagers')}</span>
+                  {t('tabManagers')}
                 </TabsTrigger>
                 {platformAdmin ? (
-                  <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="manifest">
+                  <TabsTrigger className="flex-none px-2.5" value="manifest">
                     <AppWindow className="size-4" aria-hidden />
-                    <span className="whitespace-normal">{t('tabManifest')}</span>
+                    {t('tabManifest')}
                   </TabsTrigger>
                 ) : null}
               </TabsList>
