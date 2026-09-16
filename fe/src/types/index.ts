@@ -20,6 +20,7 @@ export type User = {
     eventType: TimelineEventType;
     title: string;
     metadata?: unknown;
+    sourceApp?: string | null;
     createdAt: string;
   }>;
   metadata?: {

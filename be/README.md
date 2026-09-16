@@ -36,6 +36,7 @@ BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập t
 - Các loại sự kiện: `JOIN_BCN`, `COURSE_COMPLETE`, `QUIZ_COMPLETE`, `PROJECT_COMPLETE`, `SEMESTER_COMPLETE`
 - User xem timeline chính thức của mình ở chế độ chỉ đọc
 - Admin tạo/sửa/xóa sự kiện timeline cho user
+- App nguồn (Quiz, …) ghi mốc đã xác nhận qua `POST /internal/timeline-events` với HTTP Basic `clientId:clientSecret` và `idempotencyKey`. Admin cấp/vô hiệu hoá từng server key trong RBAC.
 
 ### Security
 

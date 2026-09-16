@@ -2,13 +2,18 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
+  UnauthorizedException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTimelineEventDto } from './dto/create-timeline-event.dto';
 import { UpdateTimelineEventDto } from './dto/update-timeline-event.dto';
+import { RecordTimelineEventDto } from './dto/record-timeline-event.dto';
 import { UsersListCacheService } from '../users/users-list-cache.service';
 import { TimelineEventsCacheService } from './timeline-events-cache.service';
 import { Role } from '../auth/enums/role.enum';
@@ -91,6 +96,116 @@ export class TimelineEventsService implements OnModuleInit {
     });
     await this.invalidateCaches(userId);
     return created;
+  }
+
+  async recordFromApplication(
+    authorization: string | undefined,
+    dto: RecordTimelineEventDto,
+  ) {
+    const app = await this.authenticateApplication(authorization);
+    const existing = await this.prisma.timelineEvent.findUnique({
+      where: { idempotencyKey: dto.idempotencyKey },
+    });
+    if (existing) {
+      if (existing.userUuid !== dto.userId || existing.sourceApp !== app.code) {
+        throw new ConflictException({
+          code: 'IDEMPOTENCY_CONFLICT',
+          message: 'idempotencyKey is already used by another timeline event',
+        });
+      }
+      return existing;
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.userId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${dto.userId} not found`);
+    }
+
+    try {
+      const created = await this.prisma.timelineEvent.create({
+        data: {
+          userUuid: dto.userId,
+          eventType: dto.eventType,
+          title: dto.title,
+          metadata: dto.metadata,
+          sourceApp: app.code,
+          idempotencyKey: dto.idempotencyKey,
+        },
+      });
+      await this.prisma.authAuditLog.create({
+        data: {
+          id: randomUUID(),
+          userId: dto.userId,
+          eventType: 'TIMELINE_RECORDED',
+          applicationCode: app.code,
+          metadata: {
+            timelineEventId: created.id,
+            eventType: dto.eventType,
+            idempotencyKey: dto.idempotencyKey,
+          },
+        },
+      });
+      await this.invalidateCaches(dto.userId);
+      return created;
+    } catch (error) {
+      if ((error as { code?: string }).code !== 'P2002') throw error;
+      const raced = await this.prisma.timelineEvent.findUnique({
+        where: { idempotencyKey: dto.idempotencyKey },
+      });
+      if (raced) return raced;
+      throw error;
+    }
+  }
+
+  private async authenticateApplication(header: string | undefined) {
+    const match = header?.match(/^Basic (\S+)$/i);
+    if (!match) {
+      throw new UnauthorizedException({
+        code: 'APP_CREDENTIALS_INVALID',
+        message: 'Application Basic credentials are required',
+      });
+    }
+    const decoded = Buffer.from(match[1], 'base64').toString('utf8');
+    const separator = decoded.indexOf(':');
+    const clientId = separator >= 0 ? decoded.slice(0, separator) : '';
+    const clientSecret = separator >= 0 ? decoded.slice(separator + 1) : '';
+    const app = clientId
+      ? await this.prisma.application.findUnique({
+          where: { clientId },
+          select: {
+            id: true,
+            code: true,
+            status: true,
+            clientSecrets: {
+              where: { status: 'ACTIVE' },
+              select: { secretHash: true },
+            },
+          },
+        })
+      : null;
+    let secretOk = false;
+    for (const key of app?.clientSecrets ?? []) {
+      if (await bcrypt.compare(clientSecret, key.secretHash)) {
+        secretOk = true;
+        break;
+      }
+    }
+    if (!secretOk) {
+      throw new UnauthorizedException({
+        code: 'APP_CREDENTIALS_INVALID',
+        message: 'Application credentials are invalid',
+      });
+    }
+    if (app!.status !== 'ACTIVE') {
+      throw new ForbiddenException({
+        code: 'APP_DISABLED',
+        message: 'Application is disabled',
+      });
+    }
+    return app!;
   }
 
   async findAllByUser(userId: string, page: number = 1, limit: number = 20) {

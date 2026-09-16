@@ -596,6 +596,7 @@ export default function AdminUserDetailPage() {
                   <TableRow>
                     <TableHead>{tt('type')}</TableHead>
                     <TableHead>{tt('eventTitle')}</TableHead>
+                    <TableHead>{tt('source')}</TableHead>
                     <TableHead>{tt('when')}</TableHead>
                     <TableHead className="w-24">
                       <span className="sr-only">{tc('actions')}</span>
@@ -609,6 +610,9 @@ export default function AdminUserDetailPage() {
                         {tt(`events.${item.eventType}`)}
                       </TableCell>
                       <TableCell>{item.title}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {item.sourceApp || tt('sourceAdmin')}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
                         {formatDate(item.createdAt)}
                       </TableCell>

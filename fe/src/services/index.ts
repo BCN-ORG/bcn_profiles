@@ -24,6 +24,7 @@ export type TimelineEvent = {
   eventType: TimelineEventType;
   title: string;
   metadata?: unknown;
+  sourceApp?: string | null;
   createdAt: string;
 };
 
@@ -236,11 +237,22 @@ export const adminUserService = {
   unblock: (id: string) => request.patch(`/users/${id}/unblock`),
 };
 
+export type RbacClientSecret = {
+  id: string;
+  label: string | null;
+  status: 'ACTIVE' | 'DISABLED';
+  createdAt: string;
+  disabledAt?: string | null;
+};
+
 export type RbacApplication = {
   id: string;
   code: string;
   name: string;
   clientId: string;
+  clientSecret?: string;
+  clientSecretId?: string;
+  clientSecrets?: RbacClientSecret[];
   status: 'ACTIVE' | 'DISABLED';
   require2fa: boolean;
   redirectUris: { id: string; redirectUri: string }[];
@@ -291,6 +303,20 @@ export const rbacService = {
     require2fa?: boolean;
     redirectUri?: string;
   }) => request.post<RbacApplication>('/admin/applications', body),
+  createClientSecret: (code: string, body: { label?: string } = {}) =>
+    request.post<RbacClientSecret & { clientSecret: string }>(
+      `/admin/applications/${code}/client-secrets`,
+      body,
+    ),
+  setClientSecretStatus: (
+    code: string,
+    secretId: string,
+    status: 'ACTIVE' | 'DISABLED',
+  ) =>
+    request.patch<RbacClientSecret>(
+      `/admin/applications/${code}/client-secrets/${secretId}`,
+      { status },
+    ),
   updateApp: (
     code: string,
     body: {

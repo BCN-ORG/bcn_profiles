@@ -212,22 +212,37 @@ model MembershipOverride {
 }
 
 model Application {
-  id           String                   @id
-  code         String                   @unique
+  id           String                    @id
+  code         String                    @unique
   name         String
-  clientId     String                   @unique
-  status       ApplicationStatus        @default(ACTIVE)
-  require2fa   Boolean                  @default(false)
-  createdAt    DateTime                 @default(now())
-  updatedAt    DateTime                 @updatedAt
+  clientId     String                    @unique
+  status       ApplicationStatus         @default(ACTIVE)
+  require2fa   Boolean                   @default(false)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
   redirectUris ApplicationRedirectUri[]
   userAccess   UserAppAccess[]
   roles        AppRole[]
   permissions  Permission[]
   userAppRoles UserAppRole[]
   managers     ApplicationManager[]
+  clientSecrets ApplicationClientSecret[]
 
   @@map("applications")
+}
+
+model ApplicationClientSecret {
+  id            String            @id
+  applicationId String
+  secretHash    String
+  label         String?
+  status        ApplicationStatus @default(ACTIVE)
+  createdAt     DateTime          @default(now())
+  disabledAt    DateTime?
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, status])
+  @@map("application_client_secrets")
 }
 
 model ApplicationRedirectUri {
@@ -363,17 +378,20 @@ model TwoFactorRecoveryCode {
 }
 
 model TimelineEvent {
-  id        Int       @id @default(autoincrement())
-  userUuid  String    @map("user_uuid")
-  eventType EventType @map("event_type")
-  title     String
-  metadata  Json?
-  createdAt DateTime  @default(now()) @map("created_at")
+  id             Int       @id @default(autoincrement())
+  userUuid       String    @map("user_uuid")
+  eventType      EventType @map("event_type")
+  title          String
+  metadata       Json?
+  sourceApp      String?   @map("source_app")
+  idempotencyKey String?   @unique @map("idempotency_key")
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userUuid], references: [id], onDelete: Cascade)
 
   @@index([userUuid])
   @@index([userUuid, createdAt(sort: Desc)])
+  @@index([sourceApp])
   @@map("timeline_events")
 }
 

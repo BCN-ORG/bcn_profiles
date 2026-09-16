@@ -3,7 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcrypt';
+import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ApplicationStatus } from 'prisma/client/enums';
 import { AuthorizationService } from './authorization.service';
@@ -23,8 +24,8 @@ export class ApplicationsAdminService {
     private readonly authorization: AuthorizationService,
   ) {}
 
-  listApplications(actor: { id: string; role: string }) {
-    return this.prisma.application.findMany({
+  async listApplications(actor: { id: string; role: string }) {
+    const apps = await this.prisma.application.findMany({
       where:
         actor.role === 'ADMIN'
           ? undefined
@@ -42,9 +43,10 @@ export class ApplicationsAdminService {
       },
       orderBy: { code: 'asc' },
     });
+    return apps;
   }
 
-  getApplication(appCode: string) {
+  async getApplication(appCode: string) {
     return this.findApplication(appCode, {
       redirectUris: true,
       roles: { include: { permissions: { include: { permission: true } } } },
@@ -55,6 +57,16 @@ export class ApplicationsAdminService {
         },
       },
       _count: { select: { userAccess: true, userAppRoles: true } },
+      clientSecrets: {
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          label: true,
+          status: true,
+          createdAt: true,
+          disabledAt: true,
+        },
+      },
     });
   }
 
@@ -84,7 +96,79 @@ export class ApplicationsAdminService {
     await this.authorization.audit(null, 'APP_CREATED', code, {
       clientId: app.clientId,
     });
-    return this.getApplication(code);
+    const issued = await this.createClientSecret(code, { label: 'Initial' });
+    return {
+      ...(await this.getApplication(code)),
+      clientSecret: issued.clientSecret,
+      clientSecretId: issued.id,
+    };
+  }
+
+  async createClientSecret(appCode: string, body: { label?: string } = {}) {
+    const app = await this.findApplication(appCode);
+    const count = await this.prisma.applicationClientSecret.count({
+      where: { applicationId: app.id },
+    });
+    if (count >= 10) {
+      throw new BadRequestException(
+        'An application can have at most 10 server keys',
+      );
+    }
+    const { clientSecret, secretHash } = await this.issueClientSecret();
+    const created = await this.prisma.applicationClientSecret.create({
+      data: {
+        id: `secret-${randomUUID()}`,
+        applicationId: app.id,
+        secretHash,
+        label: body.label?.trim() || `Key ${count + 1}`,
+        status: 'ACTIVE',
+      },
+      select: {
+        id: true,
+        label: true,
+        status: true,
+        createdAt: true,
+        disabledAt: true,
+      },
+    });
+    await this.authorization.audit(null, 'APP_SECRET_CREATED', app.code, {
+      secretId: created.id,
+    });
+    return { ...created, clientSecret };
+  }
+
+  async setClientSecretStatus(
+    appCode: string,
+    secretId: string,
+    status: ApplicationStatus,
+  ) {
+    const app = await this.findApplication(appCode);
+    const secret = await this.prisma.applicationClientSecret.findFirst({
+      where: { id: secretId, applicationId: app.id },
+      select: { id: true },
+    });
+    if (!secret) throw new NotFoundException('Server key not found');
+    const updated = await this.prisma.applicationClientSecret.update({
+      where: { id: secret.id },
+      data: {
+        status,
+        disabledAt: status === 'DISABLED' ? new Date() : null,
+      },
+      select: {
+        id: true,
+        label: true,
+        status: true,
+        createdAt: true,
+        disabledAt: true,
+      },
+    });
+    await this.authorization.audit(
+      null,
+      status === 'DISABLED' ? 'APP_SECRET_DISABLED' : 'APP_SECRET_ENABLED',
+      app.code,
+      { secretId: secret.id },
+    );
+    return updated;
   }
 
   async updateApplication(
@@ -760,6 +844,14 @@ export class ApplicationsAdminService {
     }
     if (manifest.auth?.redirectUri)
       this.validateRedirectUri(manifest.auth.redirectUri);
+  }
+
+  private async issueClientSecret() {
+    const clientSecret = randomBytes(32).toString('base64url');
+    return {
+      clientSecret,
+      secretHash: await bcrypt.hash(clientSecret, 10),
+    };
   }
 
   private async findApplication(

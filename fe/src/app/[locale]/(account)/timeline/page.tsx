@@ -57,6 +57,11 @@ export default function TimelinePage() {
                         <p className="mt-1 text-xs font-medium text-primary">
                           {t(`events.${item.eventType}`)}
                         </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t('recordedBy', {
+                            app: item.sourceApp || t('sourceAdmin'),
+                          })}
+                        </p>
                       </div>
                       <time className="text-xs text-muted-foreground">
                         {formatDate(item.createdAt)}

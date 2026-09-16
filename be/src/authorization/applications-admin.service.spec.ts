@@ -6,7 +6,28 @@ describe('ApplicationsAdminService', () => {
 
   function setup() {
     const prisma = {
-      application: { findFirst: jest.fn().mockResolvedValue(app) },
+      application: {
+        findFirst: jest.fn().mockResolvedValue(app),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      applicationClientSecret: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockImplementation(({ data }) => ({
+          id: data.id,
+          label: data.label,
+          status: data.status,
+          createdAt: new Date('2026-09-16T00:00:00Z'),
+          disabledAt: null,
+        })),
+        findFirst: jest.fn().mockResolvedValue({ id: 'secret-1' }),
+        update: jest.fn().mockImplementation(({ data }) => ({
+          id: 'secret-1',
+          label: 'Key 1',
+          status: data.status,
+          createdAt: new Date('2026-09-16T00:00:00Z'),
+          disabledAt: data.disabledAt ?? null,
+        })),
+      },
       permission: {
         create: jest.fn().mockImplementation(({ data }) => data),
         findMany: jest
@@ -53,6 +74,65 @@ describe('ApplicationsAdminService', () => {
     expect(authorization.invalidateApplication).toHaveBeenCalledWith(
       app.id,
       app.code,
+    );
+  });
+
+  it('issues a server key without exposing the stored hash', async () => {
+    const { service, prisma, authorization } = setup();
+    const result = await service.createClientSecret('quiz', {
+      label: 'Quiz prod',
+    });
+
+    expect(result.clientSecret).toEqual(expect.any(String));
+    expect(result.clientSecret.length).toBeGreaterThan(20);
+    expect(result).not.toHaveProperty('secretHash');
+    expect(prisma.applicationClientSecret.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          applicationId: app.id,
+          label: 'Quiz prod',
+          secretHash: expect.any(String),
+        }),
+      }),
+    );
+    expect(authorization.audit).toHaveBeenCalledWith(
+      null,
+      'APP_SECRET_CREATED',
+      'QUIZ',
+      { secretId: result.id },
+    );
+  });
+
+  it('rejects issuing more than 10 server keys', async () => {
+    const { service, prisma } = setup();
+    prisma.applicationClientSecret.count.mockResolvedValue(10);
+
+    await expect(service.createClientSecret('quiz')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.applicationClientSecret.create).not.toHaveBeenCalled();
+  });
+
+  it('disables a server key', async () => {
+    const { service, prisma, authorization } = setup();
+    const result = await service.setClientSecretStatus(
+      'quiz',
+      'secret-1',
+      'DISABLED',
+    );
+
+    expect(result.status).toBe('DISABLED');
+    expect(prisma.applicationClientSecret.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'secret-1' },
+        data: expect.objectContaining({ status: 'DISABLED' }),
+      }),
+    );
+    expect(authorization.audit).toHaveBeenCalledWith(
+      null,
+      'APP_SECRET_DISABLED',
+      'QUIZ',
+      { secretId: 'secret-1' },
     );
   });
 });

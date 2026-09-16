@@ -109,6 +109,14 @@ class UpdatePermissionDto {
   @IsOptional() @IsBoolean() deprecated?: boolean;
 }
 
+class CreateClientSecretDto {
+  @IsOptional() @IsString() label?: string;
+}
+
+class UpdateClientSecretDto {
+  @IsIn(['ACTIVE', 'DISABLED']) status!: 'ACTIVE' | 'DISABLED';
+}
+
 class ManifestDto {
   @IsString() content!: string;
 }
@@ -207,6 +215,25 @@ export class AuthorizationController {
   @Roles(Role.ADMIN)
   createApplication(@Body() dto: CreateApplicationDto) {
     return this.appsAdmin.createApplication(dto);
+  }
+
+  @Post('admin/applications/:app/client-secrets')
+  @Roles(Role.ADMIN)
+  createClientSecret(
+    @Param('app') app: string,
+    @Body() dto: CreateClientSecretDto,
+  ) {
+    return this.appsAdmin.createClientSecret(app, dto);
+  }
+
+  @Patch('admin/applications/:app/client-secrets/:secretId')
+  @Roles(Role.ADMIN)
+  setClientSecretStatus(
+    @Param('app') app: string,
+    @Param('secretId') secretId: string,
+    @Body() dto: UpdateClientSecretDto,
+  ) {
+    return this.appsAdmin.setClientSecretStatus(app, secretId, dto.status);
   }
 
   @Patch('admin/applications/:app')

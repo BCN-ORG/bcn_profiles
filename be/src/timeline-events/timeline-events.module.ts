@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TimelineEventsService } from './timeline-events.service';
 import { TimelineEventsController } from './timeline-events.controller';
+import { InternalTimelineEventsController } from './internal-timeline-events.controller';
 import { TimelineEventsCacheService } from './timeline-events-cache.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [PrismaModule, UsersModule],
-  controllers: [TimelineEventsController],
+  controllers: [TimelineEventsController, InternalTimelineEventsController],
   providers: [TimelineEventsService, TimelineEventsCacheService],
   exports: [TimelineEventsService, TimelineEventsCacheService],
 })

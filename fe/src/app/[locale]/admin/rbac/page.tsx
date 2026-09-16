@@ -2,12 +2,13 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   AppWindow,
   Check,
   ChevronRight,
+  Copy,
   KeyRound,
   Link2,
   LockKeyhole,
@@ -19,6 +20,7 @@ import {
   Upload,
   UserCog,
 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Link } from '@/i18n/navigation';
 import {
   Button,
@@ -44,7 +46,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -62,6 +64,7 @@ function roleHasPermission(
 export default function AdminRbacPage() {
   const t = useTranslations('rbac');
   const tc = useTranslations('common');
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const platformAdmin = isAdmin(user);
@@ -83,6 +86,10 @@ export default function AdminRbacPage() {
   const [managerUserId, setManagerUserId] = useState('');
   const [memberUserId, setMemberUserId] = useState('');
   const [manifest, setManifest] = useState('');
+  const [revealedSecret, setRevealedSecret] = useState<{
+    appCode: string;
+    secret: string;
+  } | null>(null);
 
   const appsQuery = useQuery({
     queryKey: ['admin', 'rbac', 'apps'],
@@ -168,7 +175,18 @@ export default function AdminRbacPage() {
         require2fa: false,
       });
       setShowCreate(false);
+      if (created.clientSecret) {
+        setRevealedSecret({
+          appCode: created.code,
+          secret: created.clientSecret,
+        });
+      }
     }, t('appCreated'));
+  }
+
+  async function copySecret(secret: string) {
+    await navigator.clipboard.writeText(secret);
+    toast.success(t('secretCopied'));
   }
 
   return (
@@ -391,7 +409,51 @@ export default function AdminRbacPage() {
                         {app.clientId}
                       </dd>
                     </div>
+                    <div className="rounded-lg bg-muted/45 px-3 py-2">
+                      <dt className="text-xs text-muted-foreground">
+                        {t('clientSecret')}
+                      </dt>
+                      <dd className="mt-0.5 text-xs font-medium">
+                        {t('activeKeys', {
+                          count:
+                            app.clientSecrets?.filter(
+                              (key) => key.status === 'ACTIVE',
+                            ).length ?? 0,
+                        })}
+                      </dd>
+                    </div>
                   </dl>
+                  {revealedSecret?.appCode === app.code ? (
+                    <Alert className="border-primary/20 bg-primary/5 p-4">
+                      <KeyRound aria-hidden />
+                      <AlertTitle>{t('clientSecretReady')}</AlertTitle>
+                      <AlertDescription className="space-y-3">
+                        <p>{t('clientSecretHint')}</p>
+                        <code className="block break-all rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-foreground">
+                          {revealedSecret.secret}
+                        </code>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void copySecret(revealedSecret.secret)}
+                          >
+                            <Copy className="size-4" aria-hidden />
+                            {t('copySecret')}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setRevealedSecret(null)}
+                          >
+                            {t('dismissSecret')}
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
                   <div className="flex flex-wrap gap-3 pt-1 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <Shield className="size-3.5" aria-hidden />
@@ -561,6 +623,12 @@ export default function AdminRbacPage() {
                   <Link2 className="size-4" aria-hidden />
                   <span className="whitespace-normal">{t('tabUris')}</span>
                 </TabsTrigger>
+                {platformAdmin ? (
+                  <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="keys">
+                    <KeyRound className="size-4" aria-hidden />
+                    <span className="whitespace-normal">{t('tabKeys')}</span>
+                  </TabsTrigger>
+                ) : null}
                 <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="managers">
                   <UserCog className="size-4" aria-hidden />
                   <span className="whitespace-normal">{t('tabManagers')}</span>
@@ -890,6 +958,110 @@ export default function AdminRbacPage() {
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="keys" className="mt-4">
+                <Card>
+                  <CardHeader className="flex-row items-start justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-sm">{t('tabKeys')}</CardTitle>
+                      <CardDescription>{t('keysHint')}</CardDescription>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          const issued = await rbacService.createClientSecret(
+                            app.code,
+                          );
+                          setRevealedSecret({
+                            appCode: app.code,
+                            secret: issued.clientSecret,
+                          });
+                        })
+                      }
+                    >
+                      <Plus className="size-4" aria-hidden />
+                      {t('issueKey')}
+                    </Button>
+                  </CardHeader>
+                  <CardContent>
+                    {app.clientSecrets?.length ? (
+                      <ul className="space-y-2">
+                        {app.clientSecrets.map((key) => (
+                          <li
+                            key={key.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium">{key.label || key.id}</p>
+                              <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                                {formatDate(key.createdAt, locale)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <StatusBadge status={key.status} />
+                              {key.status === 'ACTIVE' ? (
+                                <ConfirmDialog
+                                  title={t('disableKeyTitle', {
+                                    key: key.label || key.id,
+                                  })}
+                                  description={t('disableKeyConfirm')}
+                                  confirmLabel={t('disableKeyAction')}
+                                  cancelLabel={tc('cancel')}
+                                  pendingLabel={tc('loading')}
+                                  onConfirm={() =>
+                                    run(() =>
+                                      rbacService.setClientSecretStatus(
+                                        app.code,
+                                        key.id,
+                                        'DISABLED',
+                                      ),
+                                    )
+                                  }
+                                  trigger={
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="danger"
+                                      disabled={busy}
+                                    >
+                                      {t('disable')}
+                                    </Button>
+                                  }
+                                />
+                              ) : (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(() =>
+                                      rbacService.setClientSecretStatus(
+                                        app.code,
+                                        key.id,
+                                        'ACTIVE',
+                                      ),
+                                    )
+                                  }
+                                >
+                                  {t('enableKey')}
+                                </Button>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {t('noKeys')}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="uris" className="mt-4">
