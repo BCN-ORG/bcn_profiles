@@ -4,6 +4,8 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
+  MinLength,
 } from 'class-validator';
 
 export enum EventType {
@@ -21,6 +23,8 @@ export class CreateTimelineEventDto {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(200)
   title!: string;
 
   @IsObject()

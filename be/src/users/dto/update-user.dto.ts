@@ -8,7 +8,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { UserMetadataDto } from './user-metadata.dto';
 
 export class UpdateUserDto {
@@ -33,6 +33,9 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString({ message: 'Số điện thoại phải là chuỗi' })
+  @Transform(({ value }): unknown =>
+    typeof value === 'string' ? value.trim() || undefined : (value as unknown),
+  )
   phone?: string;
 
   @IsOptional()

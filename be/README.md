@@ -34,8 +34,8 @@ BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập t
 
 - Quản lý sự kiện timeline theo user
 - Các loại sự kiện: `JOIN_BCN`, `COURSE_COMPLETE`, `QUIZ_COMPLETE`, `PROJECT_COMPLETE`, `SEMESTER_COMPLETE`
-- User tạo/sửa sự kiện của mình
-- Admin có quyền quản trị cao hơn trên dữ liệu timeline
+- User xem timeline chính thức của mình ở chế độ chỉ đọc
+- Admin tạo/sửa/xóa sự kiện timeline cho user
 
 ### Security
 

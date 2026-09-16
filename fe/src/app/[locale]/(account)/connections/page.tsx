@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/api';
 import { Button, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { identityService } from '@/services';
 import { PageShell } from '@/components/layout/page-shell';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   SocialIconBadge,
   type SocialProvider,
@@ -121,17 +122,24 @@ export default function ConnectionsPage() {
                     >
                       {tc('sync')}
                     </Button>
-                    <Button
-                      variant="danger"
-                      disabled={unlink.isPending}
-                      onClick={() => {
-                        if (confirm(`${tc('disconnect')} ${provider.name}?`)) {
-                          unlink.mutate(provider.id);
-                        }
-                      }}
-                    >
-                      {tc('disconnect')}
-                    </Button>
+                    <ConfirmDialog
+                      title={t('disconnectTitle', {
+                        provider: provider.name,
+                      })}
+                      description={t('disconnectConfirm')}
+                      confirmLabel={tc('disconnect')}
+                      cancelLabel={tc('cancel')}
+                      pendingLabel={tc('loading')}
+                      onConfirm={() => unlink.mutateAsync(provider.id)}
+                      trigger={
+                        <Button
+                          variant="danger"
+                          disabled={unlink.isPending}
+                        >
+                          {tc('disconnect')}
+                        </Button>
+                      }
+                    />
                   </div>
                 ) : (
                   <Button

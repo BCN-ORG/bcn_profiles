@@ -5,8 +5,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
+  AppWindow,
+  Check,
+  ChevronRight,
   KeyRound,
   Link2,
+  LockKeyhole,
   Plus,
   Search,
   Shield,
@@ -20,6 +24,7 @@ import {
   Button,
   EmptyState,
   PageHeader,
+  Skeleton,
   StatusBadge,
 } from '@/components/ui/primitives';
 import {
@@ -38,8 +43,10 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAuth } from '@/components/auth/auth-provider';
 import { isAdmin } from '@/lib/onboarding';
 
@@ -124,8 +131,10 @@ export default function AdminRbacPage() {
       await action();
       await invalidate();
       toast.success(ok);
+      return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tc('error'));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -177,6 +186,18 @@ export default function AdminRbacPage() {
         }
       />
 
+      {!platformAdmin ? (
+        <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+          <Shield className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+          <div>
+            <p className="font-medium">{t('managerMode')}</p>
+            <p className="mt-1 text-muted-foreground">
+              {t('managerModeHint')}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {showCreate && platformAdmin ? (
         <Card>
           <CardHeader>
@@ -199,8 +220,9 @@ export default function AdminRbacPage() {
                 ] as const
               ).map(([key, label, placeholder, type]) => (
                 <div key={key} className="space-y-2">
-                  <Label>{label}</Label>
+                  <Label htmlFor={`create-app-${key}`}>{label}</Label>
                   <Input
+                    id={`create-app-${key}`}
                     type={type}
                     required={key !== 'redirectUri'}
                     placeholder={placeholder}
@@ -242,9 +264,28 @@ export default function AdminRbacPage() {
         </Card>
       ) : null}
 
+      <div className="space-y-4 xl:hidden">
+        <Label htmlFor="rbac-app-select">{t('selectApplication')}</Label>
+        <select
+          id="rbac-app-select"
+          value={activeCode ?? ''}
+          onChange={(event) => {
+            setSelectedCode(event.target.value || null);
+            setSelectedRole(null);
+          }}
+          className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25"
+        >
+          {apps.map((item) => (
+            <option key={item.id} value={item.code}>
+              {item.name} ({item.code})
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         {/* App picker */}
-        <Card className="h-fit xl:sticky xl:top-20">
+        <Card className="hidden h-fit xl:sticky xl:top-20 xl:block">
           <CardHeader className="gap-3 space-y-0 pb-3">
             <CardTitle className="text-sm">{t('applications')}</CardTitle>
             <div className="relative">
@@ -272,21 +313,13 @@ export default function AdminRbacPage() {
                     setSelectedRole(null);
                   }}
                   className={cn(
-                    'rounded-xl px-3 py-2.5 text-left transition-colors',
+                    'w-full rounded-lg px-3 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     active
-                      ? 'bg-primary/10 ring-1 ring-primary/20'
+                      ? 'bg-primary/10 text-primary'
                       : 'hover:bg-muted/70',
                   )}
                 >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        'size-2 shrink-0 rounded-full',
-                        item.status === 'ACTIVE'
-                          ? 'bg-primary'
-                          : 'bg-muted-foreground/40',
-                      )}
-                    />
+                  <div className="flex items-center justify-between gap-2">
                     <span
                       className={cn(
                         'truncate text-sm font-semibold',
@@ -295,19 +328,20 @@ export default function AdminRbacPage() {
                     >
                       {item.code}
                     </span>
+                    <StatusBadge status={item.status} />
                   </div>
-                  <p className="mt-0.5 truncate pl-4 text-xs text-muted-foreground">
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
                     {item.name}
                   </p>
-                  <p className="mt-1.5 flex flex-wrap gap-2 pl-4 text-[10px] text-muted-foreground">
+                  <p className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
                     <span>
                       {item.roles.length} {t('rolesShort')}
                     </span>
-                    <span>·</span>
+                    <span aria-hidden>/</span>
                     <span>
                       {item.permissions.length} {t('permsShort')}
                     </span>
-                    <span>·</span>
+                    <span aria-hidden>/</span>
                     <span>
                       {item._count?.userAccess ?? 0} {t('usersShort')}
                     </span>
@@ -325,8 +359,8 @@ export default function AdminRbacPage() {
 
         {app ? (
           <div className="flex min-w-0 flex-col gap-4">
-            <Card>
-              <CardContent className="flex flex-col gap-4 pt-5 md:flex-row md:items-start md:justify-between">
+            <Card className="shadow-none">
+              <CardContent className="flex flex-col gap-5 py-1 md:flex-row md:items-start md:justify-between">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-xl font-semibold tracking-tight">
@@ -340,20 +374,20 @@ export default function AdminRbacPage() {
                       </span>
                     ) : null}
                   </div>
-                  <dl className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-                    <div>
-                      <dt className="inline text-xs uppercase tracking-wide">
-                        {t('code')} ·{' '}
+                  <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                    <div className="rounded-lg bg-muted/45 px-3 py-2">
+                      <dt className="text-xs text-muted-foreground">
+                        {t('code')}
                       </dt>
-                      <dd className="inline font-mono text-foreground">
+                      <dd className="mt-0.5 font-mono text-xs text-foreground">
                         {app.code}
                       </dd>
                     </div>
-                    <div>
-                      <dt className="inline text-xs uppercase tracking-wide">
-                        {t('clientId')} ·{' '}
+                    <div className="rounded-lg bg-muted/45 px-3 py-2">
+                      <dt className="text-xs text-muted-foreground">
+                        {t('clientId')}
                       </dt>
-                      <dd className="inline font-mono text-foreground">
+                      <dd className="mt-0.5 font-mono text-xs text-foreground">
                         {app.clientId}
                       </dd>
                     </div>
@@ -380,139 +414,300 @@ export default function AdminRbacPage() {
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy || !platformAdmin}
-                    onClick={() =>
-                      run(() =>
-                        rbacService.updateApp(app.code, {
-                          status:
-                            app.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE',
-                        }),
-                      )
-                    }
-                  >
-                    {app.status === 'ACTIVE' ? t('disable') : t('enable')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={busy || !platformAdmin}
-                    onClick={() =>
-                      run(() =>
-                        rbacService.updateApp(app.code, {
-                          require2fa: !app.require2fa,
-                        }),
-                      )
-                    }
-                  >
-                    {app.require2fa ? t('unrequire2fa') : t('require2fa')}
-                  </Button>
-                </div>
+                {platformAdmin ? (
+                  <div className="flex flex-wrap gap-2">
+                    {app.status === 'ACTIVE' ? (
+                      <ConfirmDialog
+                        title={t('disableTitle', { app: app.name })}
+                        description={t('disableConfirm')}
+                        confirmLabel={t('disableAction')}
+                        cancelLabel={tc('cancel')}
+                        pendingLabel={tc('loading')}
+                        onConfirm={() =>
+                          run(() =>
+                            rbacService.updateApp(app.code, {
+                              status: 'DISABLED',
+                            }),
+                          )
+                        }
+                        trigger={
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="danger"
+                            disabled={busy}
+                          >
+                            {t('disable')}
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(() =>
+                            rbacService.updateApp(app.code, {
+                              status: 'ACTIVE',
+                            }),
+                          )
+                        }
+                      >
+                        {t('enable')}
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        run(() =>
+                          rbacService.updateApp(app.code, {
+                            require2fa: !app.require2fa,
+                          }),
+                        )
+                      }
+                    >
+                      {app.require2fa ? t('unrequire2fa') : t('require2fa')}
+                    </Button>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
-            <Tabs defaultValue="access">
-              <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
-                <TabsTrigger value="access">{t('tabAccess')}</TabsTrigger>
-                <TabsTrigger value="uris">{t('tabUris')}</TabsTrigger>
-                <TabsTrigger value="users">{t('tabUsers')}</TabsTrigger>
-                <TabsTrigger value="managers">{t('tabManagers')}</TabsTrigger>
+            <section
+              aria-labelledby="auth-flow-title"
+              className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"
+            >
+              <div className="mb-4 flex items-start gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <KeyRound className="size-5" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <h2 id="auth-flow-title" className="font-semibold tracking-tight">
+                    {t('decisionFlow')}
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {t('decisionFlowHint')}
+                  </p>
+                </div>
+              </div>
+              <ol className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  {
+                    icon: Users,
+                    title: t('flowIdentity'),
+                    hint: t('flowIdentityHint'),
+                  },
+                  {
+                    icon: Shield,
+                    title: t('flowMembership'),
+                    hint: t('flowMembershipHint'),
+                  },
+                  {
+                    icon: AppWindow,
+                    title: t('flowAccess'),
+                    hint: t('flowAccessHint'),
+                  },
+                  {
+                    icon: LockKeyhole,
+                    title: t('flowPermission'),
+                    hint: t('flowPermissionHint'),
+                  },
+                ].map(({ icon: Icon, title, hint }, index) => (
+                  <li
+                    key={String(title)}
+                    className={cn(
+                      'relative flex min-h-32 gap-3 rounded-xl border border-border bg-background p-4 transition-colors',
+                      index === 3 && 'border-primary/25 bg-primary/5',
+                    )}
+                  >
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+                      <Icon className="size-5" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="mb-1 text-[11px] font-semibold tracking-[0.16em] text-primary uppercase">
+                        0{index + 1}
+                      </p>
+                      <p className="text-sm font-semibold leading-5">{title}</p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {hint}
+                      </p>
+                    </div>
+                    {index < 3 ? (
+                      <span className="absolute top-1/2 -right-3 z-10 hidden size-6 -translate-y-1/2 items-center justify-center rounded-full border border-primary/20 bg-card text-primary shadow-sm xl:flex">
+                        <ChevronRight className="size-3.5" aria-hidden />
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <Tabs defaultValue="access" className="min-w-0">
+              <TabsList className="flex w-full flex-wrap justify-start gap-1 rounded-xl border border-border bg-muted/50 p-1.5 group-data-[orientation=horizontal]/tabs:h-auto">
+                <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="access">
+                  <Shield className="size-4" aria-hidden />
+                  <span className="whitespace-normal">{t('tabAccess')}</span>
+                </TabsTrigger>
+                <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="users">
+                  <Users className="size-4" aria-hidden />
+                  <span className="whitespace-normal">{t('tabUsers')}</span>
+                </TabsTrigger>
+                <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="uris">
+                  <Link2 className="size-4" aria-hidden />
+                  <span className="whitespace-normal">{t('tabUris')}</span>
+                </TabsTrigger>
+                <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="managers">
+                  <UserCog className="size-4" aria-hidden />
+                  <span className="whitespace-normal">{t('tabManagers')}</span>
+                </TabsTrigger>
                 {platformAdmin ? (
-                  <TabsTrigger value="manifest">{t('tabManifest')}</TabsTrigger>
+                  <TabsTrigger className="h-auto min-h-11 min-w-32 px-3 py-2 data-active:text-primary" value="manifest">
+                    <AppWindow className="size-4" aria-hidden />
+                    <span className="whitespace-normal">{t('tabManifest')}</span>
+                  </TabsTrigger>
                 ) : null}
               </TabsList>
 
               {/* Role + permission (role-centric) */}
               <TabsContent value="access" className="mt-4 space-y-4">
-                <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm">{t('tabRoles')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 p-3">
-                      <form
-                        className="space-y-2"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          run(async () => {
-                            await rbacService.createRole(app.code, newRole);
-                            setSelectedRole(newRole.code.toUpperCase());
-                            setNewRole({ code: '', name: '' });
-                          });
-                        }}
-                      >
-                        <Input
-                          placeholder={t('roleCode')}
-                          value={newRole.code}
-                          onChange={(e) =>
-                            setNewRole((r) => ({ ...r, code: e.target.value }))
-                          }
-                          required
-                          disabled={!platformAdmin}
-                          className="h-9"
-                        />
-                        <Input
-                          placeholder={t('roleName')}
-                          value={newRole.name}
-                          onChange={(e) =>
-                            setNewRole((r) => ({ ...r, name: e.target.value }))
-                          }
-                          className="h-9"
-                          disabled={!platformAdmin}
-                        />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          className="w-full"
-                          disabled={busy || !platformAdmin}
+                      {platformAdmin ? (
+                        <form
+                          className="space-y-3 rounded-lg border border-dashed border-border p-3"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            run(async () => {
+                              await rbacService.createRole(app.code, newRole);
+                              setSelectedRole(newRole.code.toUpperCase());
+                              setNewRole({ code: '', name: '' });
+                            });
+                          }}
                         >
-                          <Plus className="size-3.5" aria-hidden />
-                          {t('addRole')}
-                        </Button>
-                      </form>
-                      <div className="flex flex-col gap-1">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="new-role-code">{t('roleCode')}</Label>
+                            <Input
+                              id="new-role-code"
+                              value={newRole.code}
+                              onChange={(e) =>
+                                setNewRole((r) => ({
+                                  ...r,
+                                  code: e.target.value,
+                                }))
+                              }
+                              required
+                              className="h-9"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="new-role-name">{t('roleName')}</Label>
+                            <Input
+                              id="new-role-name"
+                              value={newRole.name}
+                              onChange={(e) =>
+                                setNewRole((r) => ({
+                                  ...r,
+                                  name: e.target.value,
+                                }))
+                              }
+                              className="h-9"
+                            />
+                          </div>
+                          <Button
+                            type="submit"
+                            size="sm"
+                            className="w-full"
+                            disabled={busy}
+                          >
+                            <Plus className="size-3.5" aria-hidden />
+                            {t('addRole')}
+                          </Button>
+                        </form>
+                      ) : null}
+                      <div
+                        className="flex flex-col gap-1"
+                        aria-label={t('tabRoles')}
+                      >
                         {app.roles.map((role) => {
                           const on = activeRoleCode === role.code;
                           return (
                             <div
                               key={role.id}
                               className={cn(
-                                'flex items-center gap-1 rounded-xl',
-                                on && 'bg-primary/10',
+                                'flex items-center gap-1 rounded-lg border border-transparent',
+                                on && 'border-primary/20 bg-primary/10',
                               )}
                             >
                               <button
                                 type="button"
-                                className="min-w-0 flex-1 rounded-xl px-3 py-2 text-left"
+                                aria-pressed={on}
+                                className="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 onClick={() => setSelectedRole(role.code)}
                               >
-                                <span className="block truncate text-sm font-medium">
-                                  {role.code}
+                                <span className="flex items-center gap-2">
+                                  <span className="block truncate text-sm font-semibold">
+                                    {role.name || role.code}
+                                  </span>
+                                  {on ? (
+                                    <Check
+                                      className="size-3.5 shrink-0 text-primary"
+                                      aria-hidden
+                                    />
+                                  ) : null}
                                 </span>
-                                <span className="block truncate text-[11px] text-muted-foreground">
-                                  {role.name}
+                                <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                                  <span className="font-mono">{role.code}</span>
+                                  <span aria-hidden>/</span>
+                                  <span>
+                                    {role.permissions.length} {t('permsShort')}
+                                  </span>
                                 </span>
                               </button>
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="ghost"
-                                className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                disabled={busy || !platformAdmin}
-                                aria-label={t('remove')}
-                                onClick={() =>
-                                  run(() =>
-                                    rbacService.deleteRole(app.code, role.code),
-                                  )
-                                }
-                              >
-                                <Trash2 className="size-3.5" />
-                              </Button>
+                              {platformAdmin ? (
+                                <ConfirmDialog
+                                  title={t('deleteRoleTitle', {
+                                    role: role.code,
+                                  })}
+                                  description={t('deleteRoleConfirm')}
+                                  confirmLabel={t('deleteRoleAction')}
+                                  cancelLabel={tc('cancel')}
+                                  pendingLabel={tc('loading')}
+                                  onConfirm={() =>
+                                    run(() =>
+                                      rbacService.deleteRole(
+                                        app.code,
+                                        role.code,
+                                      ),
+                                    )
+                                  }
+                                  trigger={
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="ghost"
+                                      className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                      disabled={busy || role.isSystem}
+                                      aria-label={t('deleteRoleAction')}
+                                      title={
+                                        role.isSystem
+                                          ? t('systemRoleHint')
+                                          : t('deleteRoleAction')
+                                      }
+                                    >
+                                      <Trash2 className="size-3.5" />
+                                    </Button>
+                                  }
+                                />
+                              ) : null}
                             </div>
                           );
                         })}
@@ -535,53 +730,60 @@ export default function AdminRbacPage() {
                       <CardDescription>{t('accessHint')}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <form
-                        className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          run(async () => {
-                            await rbacService.createPermission(
-                              app.code,
-                              newPerm,
-                            );
-                            setNewPerm({ code: '', description: '' });
-                          });
-                        }}
-                      >
-                        <Input
-                          placeholder="app.resource.action"
-                          value={newPerm.code}
-                          onChange={(e) =>
-                            setNewPerm((p) => ({
-                              ...p,
-                              code: e.target.value,
-                            }))
-                          }
-                          required
-                          disabled={!platformAdmin}
-                          className="h-9 font-mono text-xs"
-                        />
-                        <Input
-                          placeholder={t('permDesc')}
-                          value={newPerm.description}
-                          onChange={(e) =>
-                            setNewPerm((p) => ({
-                              ...p,
-                              description: e.target.value,
-                            }))
-                          }
-                          className="h-9"
-                          disabled={!platformAdmin}
-                        />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          disabled={busy || !platformAdmin}
+                      {platformAdmin ? (
+                        <form
+                          className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            run(async () => {
+                              await rbacService.createPermission(
+                                app.code,
+                                newPerm,
+                              );
+                              setNewPerm({ code: '', description: '' });
+                            });
+                          }}
                         >
-                          <Plus className="size-3.5" aria-hidden />
-                          {t('addPerm')}
-                        </Button>
-                      </form>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="new-permission-code">
+                              {t('permCode')}
+                            </Label>
+                            <Input
+                              id="new-permission-code"
+                              placeholder={`${app.code.toLowerCase()}.resource.action`}
+                              value={newPerm.code}
+                              onChange={(e) =>
+                                setNewPerm((p) => ({
+                                  ...p,
+                                  code: e.target.value,
+                                }))
+                              }
+                              required
+                              className="h-9 font-mono text-xs"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="new-permission-description">
+                              {t('permDesc')}
+                            </Label>
+                            <Input
+                              id="new-permission-description"
+                              value={newPerm.description}
+                              onChange={(e) =>
+                                setNewPerm((p) => ({
+                                  ...p,
+                                  description: e.target.value,
+                                }))
+                              }
+                              className="h-9"
+                            />
+                          </div>
+                          <Button type="submit" size="sm" disabled={busy}>
+                            <Plus className="size-3.5" aria-hidden />
+                            {t('addPerm')}
+                          </Button>
+                        </form>
+                      ) : null}
 
                       {!app.permissions.length ? (
                         <EmptyState title={t('noPermsYet')} />
@@ -598,7 +800,10 @@ export default function AdminRbacPage() {
                             return (
                               <li
                                 key={perm.id}
-                                className="flex items-center gap-3 px-3 py-2.5"
+                                className={cn(
+                                  'flex items-center gap-3 px-3 py-3',
+                                  perm.deprecated && 'bg-muted/30 opacity-70',
+                                )}
                               >
                                 <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
                                   <input
@@ -629,9 +834,14 @@ export default function AdminRbacPage() {
                                     }
                                   />
                                   <span className="min-w-0">
-                                    <span className="block font-mono text-xs font-medium">
+                                    <span className="block font-mono text-xs font-medium [overflow-wrap:anywhere]">
                                       {perm.code}
                                     </span>
+                                    {perm.deprecated ? (
+                                      <Badge variant="outline" className="mt-1">
+                                        {t('deprecated')}
+                                      </Badge>
+                                    ) : null}
                                     {perm.description ? (
                                       <span className="block text-xs text-muted-foreground">
                                         {perm.description}
@@ -639,24 +849,39 @@ export default function AdminRbacPage() {
                                     ) : null}
                                   </span>
                                 </label>
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="ghost"
-                                  className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                  disabled={busy || !platformAdmin}
-                                  aria-label={t('remove')}
-                                  onClick={() =>
-                                    run(() =>
-                                      rbacService.deletePermission(
-                                        app.code,
-                                        perm.code,
-                                      ),
-                                    )
-                                  }
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </Button>
+                                {platformAdmin ? (
+                                  <ConfirmDialog
+                                    title={t('deletePermissionTitle', {
+                                      permission: perm.code,
+                                    })}
+                                    description={t('deletePermissionConfirm')}
+                                    confirmLabel={t('deletePermissionAction')}
+                                    cancelLabel={tc('cancel')}
+                                    pendingLabel={tc('loading')}
+                                    onConfirm={() =>
+                                      run(() =>
+                                        rbacService.deletePermission(
+                                          app.code,
+                                          perm.code,
+                                        ),
+                                      )
+                                    }
+                                    trigger={
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="ghost"
+                                        className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                                        disabled={busy}
+                                        aria-label={t(
+                                          'deletePermissionAction',
+                                        )}
+                                      >
+                                        <Trash2 className="size-3.5" />
+                                      </Button>
+                                    }
+                                  />
+                                ) : null}
                               </li>
                             );
                           })}
@@ -674,29 +899,35 @@ export default function AdminRbacPage() {
                     <CardDescription>{t('uriHint')}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <form
-                      className="flex flex-col gap-2 sm:flex-row"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!newUri.trim()) return;
-                        run(async () => {
-                          await rbacService.addRedirectUri(app.code, newUri);
-                          setNewUri('');
-                        });
-                      }}
-                    >
-                      <Input
-                        placeholder="https://app.example/auth/callback"
-                        value={newUri}
-                        onChange={(e) => setNewUri(e.target.value)}
-                        className="flex-1"
-                        disabled={!platformAdmin}
-                      />
-                      <Button type="submit" disabled={busy || !platformAdmin}>
-                        <Plus className="size-4" aria-hidden />
-                        {t('addUri')}
-                      </Button>
-                    </form>
+                    {platformAdmin ? (
+                      <form
+                        className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          if (!newUri.trim()) return;
+                          run(async () => {
+                            await rbacService.addRedirectUri(app.code, newUri);
+                            setNewUri('');
+                          });
+                        }}
+                      >
+                        <div className="flex-1 space-y-2">
+                          <Label htmlFor="new-redirect-uri">
+                            {t('redirectUri')}
+                          </Label>
+                          <Input
+                            id="new-redirect-uri"
+                            placeholder="https://app.example/auth/callback"
+                            value={newUri}
+                            onChange={(e) => setNewUri(e.target.value)}
+                          />
+                        </div>
+                        <Button type="submit" disabled={busy}>
+                          <Plus className="size-4" aria-hidden />
+                          {t('addUri')}
+                        </Button>
+                      </form>
+                    ) : null}
                     {app.redirectUris.length ? (
                       <ul className="space-y-2">
                         {app.redirectUris.map((uri) => (
@@ -707,23 +938,36 @@ export default function AdminRbacPage() {
                             <span className="truncate font-mono text-xs">
                               {uri.redirectUri}
                             </span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy || !platformAdmin}
-                              onClick={() =>
-                                run(() =>
-                                  rbacService.removeRedirectUri(
-                                    app.code,
-                                    uri.redirectUri,
-                                  ),
-                                )
-                              }
-                            >
-                              <Trash2 className="size-3.5" aria-hidden />
-                              {t('remove')}
-                            </Button>
+                            {platformAdmin ? (
+                              <ConfirmDialog
+                                title={t('removeUriTitle')}
+                                description={t('removeUriConfirm', {
+                                  uri: uri.redirectUri,
+                                })}
+                                confirmLabel={t('removeUriAction')}
+                                cancelLabel={tc('cancel')}
+                                pendingLabel={tc('loading')}
+                                onConfirm={() =>
+                                  run(() =>
+                                    rbacService.removeRedirectUri(
+                                      app.code,
+                                      uri.redirectUri,
+                                    ),
+                                  )
+                                }
+                                trigger={
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={busy}
+                                  >
+                                    <Trash2 className="size-3.5" aria-hidden />
+                                    {t('remove')}
+                                  </Button>
+                                }
+                              />
+                            ) : null}
                           </li>
                         ))}
                       </ul>
@@ -737,12 +981,12 @@ export default function AdminRbacPage() {
               <TabsContent value="users" className="mt-4">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-sm">{t('tabUsers')}</CardTitle>
+                    <CardTitle className="text-base">{t('tabUsers')}</CardTitle>
                     <CardDescription>{t('usersHint')}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <form
-                      className="flex flex-col gap-2 sm:flex-row"
+                      className="rounded-xl border border-border bg-muted/20 p-4"
                       onSubmit={(event) => {
                         event.preventDefault();
                         run(async () => {
@@ -754,104 +998,173 @@ export default function AdminRbacPage() {
                         });
                       }}
                     >
-                      <Input
-                        value={memberUserId}
-                        onChange={(event) =>
-                          setMemberUserId(event.target.value)
-                        }
-                        placeholder={t('memberUserId')}
-                        required
-                      />
-                      <Button type="submit" disabled={busy}>
-                        {t('grantAccess')}
-                      </Button>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <Label htmlFor="member-user-id">
+                            {t('memberUserId')}
+                          </Label>
+                          <Input
+                            id="member-user-id"
+                            value={memberUserId}
+                            onChange={(event) =>
+                              setMemberUserId(event.target.value)
+                            }
+                            placeholder="cm..."
+                            required
+                          />
+                        </div>
+                        <Button type="submit" disabled={busy}>
+                          {t('grantAccess')}
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                        {t('grantAccessHint')}
+                      </p>
                     </form>
-                    {(usersQuery.data ?? []).length === 0 ? (
+                    {usersQuery.isLoading ? (
+                      <div className="space-y-2" aria-label={tc('loading')}>
+                        <Skeleton className="h-24 w-full" />
+                        <Skeleton className="h-24 w-full" />
+                      </div>
+                    ) : usersQuery.isError ? (
+                      <div
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+                        role="alert"
+                      >
+                        <p className="text-sm text-destructive">
+                          {t('loadError')}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void usersQuery.refetch()}
+                        >
+                          {t('retry')}
+                        </Button>
+                      </div>
+                    ) : (usersQuery.data ?? []).length === 0 ? (
                       <EmptyState title={t('noUsers')} />
                     ) : (
                       <ul className="divide-y divide-border/60 rounded-xl border border-border/70">
                         {(usersQuery.data ?? []).map((row) => (
                           <li
                             key={row.id}
-                            className="flex flex-wrap items-center gap-3 px-3 py-3"
+                            className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(240px,auto)] xl:items-center"
                           >
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium">
-                                {row.user.fullName || row.user.email}
-                              </p>
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="truncate text-sm font-semibold">
+                                  {row.user.fullName || row.user.email}
+                                </p>
+                                <StatusBadge status={row.status} />
+                              </div>
                               <p className="truncate text-xs text-muted-foreground">
                                 {row.user.email}
                               </p>
-                              <p className="mt-1 truncate text-xs text-muted-foreground">
-                                {row.roles.join(', ') || '—'}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                              {app.roles.map((role) => {
-                                const assigned = row.roles.includes(role.code);
-                                return (
-                                  <label
-                                    key={role.id}
-                                    className="flex items-center gap-1 text-xs"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={assigned}
-                                      disabled={busy}
-                                      onChange={() =>
-                                        run(() =>
+                              <div className="mt-3">
+                                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                                  {t('assignedRoles')}
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {app.roles.map((role) => {
+                                    const assigned = row.roles.includes(role.code);
+                                    return (
+                                      <button
+                                        key={role.id}
+                                        type="button"
+                                        aria-pressed={assigned}
+                                        disabled={busy}
+                                        className={cn(
+                                          'inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
                                           assigned
-                                            ? applicationService.removeRole(
-                                                row.user.id,
-                                                app.code,
-                                                role.code,
-                                              )
-                                            : applicationService.assignRole(
-                                                row.user.id,
-                                                app.code,
-                                                role.code,
-                                              ),
-                                        )
-                                      }
-                                    />
-                                    {role.code}
-                                  </label>
-                                );
-                              })}
+                                            ? 'border-primary/25 bg-primary/10 text-primary'
+                                            : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+                                        )}
+                                        onClick={() =>
+                                          run(() =>
+                                            assigned
+                                              ? applicationService.removeRole(
+                                                  row.user.id,
+                                                  app.code,
+                                                  role.code,
+                                                )
+                                              : applicationService.assignRole(
+                                                  row.user.id,
+                                                  app.code,
+                                                  role.code,
+                                                ),
+                                          )
+                                        }
+                                      >
+                                        {assigned ? <Check className="size-3" aria-hidden /> : null}
+                                        {role.code}
+                                      </button>
+                                    );
+                                  })}
+                                  {!app.roles.length ? (
+                                    <span className="text-xs text-muted-foreground">
+                                      {t('noRolesYet')}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
                             </div>
-                            <StatusBadge status={row.status} />
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant={
-                                row.status === 'ACTIVE' ? 'danger' : 'outline'
-                              }
-                              disabled={busy}
-                              onClick={() =>
-                                run(() =>
-                                  row.status === 'ACTIVE'
-                                    ? applicationService.block(
-                                        row.user.id,
-                                        app.code,
-                                      )
-                                    : applicationService.grant(
+                            <div className="flex flex-wrap gap-2 xl:justify-end">
+                              {row.status === 'ACTIVE' ? (
+                                <ConfirmDialog
+                                  title={t('blockAccessTitle', {
+                                    user: row.user.fullName || row.user.email,
+                                  })}
+                                  description={t('blockAccessConfirm')}
+                                  confirmLabel={t('blockAccess')}
+                                  cancelLabel={tc('cancel')}
+                                  pendingLabel={tc('loading')}
+                                  onConfirm={() =>
+                                    run(() =>
+                                      applicationService.block(
                                         row.user.id,
                                         app.code,
                                       ),
-                                )
-                              }
-                            >
-                              {row.status === 'ACTIVE'
-                                ? t('blockAccess')
-                                : t('grantAccess')}
-                            </Button>
-                            {platformAdmin ? (
-                              <Button asChild size="sm" variant="outline">
-                                <Link href={`/admin/users/${row.user.id}`}>
-                                  {t('manageUser')}
-                                </Link>
-                              </Button>
-                            ) : null}
+                                    )
+                                  }
+                                  trigger={
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="danger"
+                                      disabled={busy}
+                                    >
+                                      {t('blockAccess')}
+                                    </Button>
+                                  }
+                                />
+                              ) : (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(() =>
+                                      applicationService.grant(
+                                        row.user.id,
+                                        app.code,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  {t('grantAccess')}
+                                </Button>
+                              )}
+                              {platformAdmin ? (
+                                <Button asChild size="sm" variant="outline">
+                                  <Link href={`/admin/users/${row.user.id}`}>
+                                    {t('manageUser')}
+                                  </Link>
+                                </Button>
+                              ) : null}
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -870,29 +1183,38 @@ export default function AdminRbacPage() {
                     <CardDescription>{t('managersHint')}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <form
-                      className="flex flex-col gap-2 sm:flex-row"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        run(async () => {
-                          await rbacService.addManager(app.code, managerUserId);
-                          setManagerUserId('');
-                        });
-                      }}
-                    >
-                      <Input
-                        value={managerUserId}
-                        onChange={(event) =>
-                          setManagerUserId(event.target.value)
-                        }
-                        placeholder={t('managerUserId')}
-                        required
-                        disabled={!platformAdmin}
-                      />
-                      <Button type="submit" disabled={busy || !platformAdmin}>
-                        {t('addManager')}
-                      </Button>
-                    </form>
+                    {platformAdmin ? (
+                      <form
+                        className="flex flex-col gap-2 sm:flex-row sm:items-end"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          run(async () => {
+                            await rbacService.addManager(
+                              app.code,
+                              managerUserId,
+                            );
+                            setManagerUserId('');
+                          });
+                        }}
+                      >
+                        <div className="flex-1 space-y-2">
+                          <Label htmlFor="manager-user-id">
+                            {t('managerUserId')}
+                          </Label>
+                          <Input
+                            id="manager-user-id"
+                            value={managerUserId}
+                            onChange={(event) =>
+                              setManagerUserId(event.target.value)
+                            }
+                            required
+                          />
+                        </div>
+                        <Button type="submit" disabled={busy}>
+                          {t('addManager')}
+                        </Button>
+                      </form>
+                    ) : null}
                     {app.managers.length ? (
                       <ul className="divide-y divide-border/60 rounded-xl border border-border/70">
                         {app.managers.map((manager) => (
@@ -908,23 +1230,37 @@ export default function AdminRbacPage() {
                                 {manager.user.email}
                               </p>
                             </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={busy || !platformAdmin}
-                              onClick={() =>
-                                run(() =>
-                                  rbacService.removeManager(
-                                    app.code,
-                                    manager.userId,
-                                  ),
-                                )
-                              }
-                            >
-                              <Trash2 className="size-3.5" aria-hidden />
-                              {t('remove')}
-                            </Button>
+                            {platformAdmin ? (
+                              <ConfirmDialog
+                                title={t('removeManagerTitle', {
+                                  user:
+                                    manager.user.fullName || manager.user.email,
+                                })}
+                                description={t('removeManagerConfirm')}
+                                confirmLabel={t('removeManagerAction')}
+                                cancelLabel={tc('cancel')}
+                                pendingLabel={tc('loading')}
+                                onConfirm={() =>
+                                  run(() =>
+                                    rbacService.removeManager(
+                                      app.code,
+                                      manager.userId,
+                                    ),
+                                  )
+                                }
+                                trigger={
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={busy}
+                                  >
+                                    <Trash2 className="size-3.5" aria-hidden />
+                                    {t('remove')}
+                                  </Button>
+                                }
+                              />
+                            ) : null}
                           </li>
                         ))}
                       </ul>
@@ -965,8 +1301,29 @@ export default function AdminRbacPage() {
               ) : null}
             </Tabs>
           </div>
-        ) : appsQuery.isLoading ? (
-          <p className="text-sm text-muted-foreground">{tc('loading')}</p>
+        ) : appsQuery.isLoading || appQuery.isLoading ? (
+          <div className="space-y-4" aria-label={tc('loading')}>
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-80 w-full" />
+          </div>
+        ) : appsQuery.isError || appQuery.isError ? (
+          <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-4 py-2" role="alert">
+              <p className="text-sm text-destructive">{t('loadError')}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  void (appsQuery.isError
+                    ? appsQuery.refetch()
+                    : appQuery.refetch())
+                }
+              >
+                {t('retry')}
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <EmptyState title={t('noApps')} description={t('createHint')} />
         )}

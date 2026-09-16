@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/utils';
 import { sessionService } from '@/services';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageShell } from '@/components/layout/page-shell';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Table,
   TableBody,
@@ -55,13 +56,22 @@ export default function SessionsPage() {
         title={t('title')}
         description={t('subtitle')}
         actions={
-          <Button
-            variant="secondary"
-            disabled={revokeOthers.isPending}
-            onClick={() => revokeOthers.mutate()}
-          >
-            {t('revokeOthers')}
-          </Button>
+          <ConfirmDialog
+            title={t('revokeOthersTitle')}
+            description={t('revokeOthersConfirm')}
+            confirmLabel={t('revokeOthers')}
+            cancelLabel={tc('cancel')}
+            pendingLabel={tc('loading')}
+            onConfirm={() => revokeOthers.mutateAsync()}
+            trigger={
+              <Button
+                variant="secondary"
+                disabled={revokeOthers.isPending}
+              >
+                {t('revokeOthers')}
+              </Button>
+            }
+          />
         }
       />
       {!query.isLoading && (!query.data || query.data.length === 0) ? (
@@ -93,15 +103,24 @@ export default function SessionsPage() {
                     <TableCell>{formatDate(session.expiresAt, locale)}</TableCell>
                     <TableCell>
                       {!session.current ? (
-                        <Button
-                          variant="danger"
-                          disabled={revoke.isPending}
-                          onClick={() => {
-                            if (confirm(tc('confirm'))) revoke.mutate(session.id);
-                          }}
-                        >
-                          {tc('revoke')}
-                        </Button>
+                        <ConfirmDialog
+                          title={t('revokeTitle')}
+                          description={t('revokeConfirm', {
+                            app: session.application || t('unknownApp'),
+                          })}
+                          confirmLabel={tc('revoke')}
+                          cancelLabel={tc('cancel')}
+                          pendingLabel={tc('loading')}
+                          onConfirm={() => revoke.mutateAsync(session.id)}
+                          trigger={
+                            <Button
+                              variant="danger"
+                              disabled={revoke.isPending}
+                            >
+                              {tc('revoke')}
+                            </Button>
+                          }
+                        />
                       ) : null}
                     </TableCell>
                   </TableRow>

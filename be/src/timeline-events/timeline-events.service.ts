@@ -73,6 +73,14 @@ export class TimelineEventsService implements OnModuleInit {
   }
 
   async create(userId: string, createDto: CreateTimelineEventDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
     const created = await this.prisma.timelineEvent.create({
       data: {
         userUuid: userId,
@@ -138,20 +146,14 @@ export class TimelineEventsService implements OnModuleInit {
     }
   }
 
-  async update(id: number, userId: string, updateDto: UpdateTimelineEventDto) {
-    const event = (await this.findOne(id, userId)) as { userUuid: string };
-
-    if (event.userUuid !== userId) {
-      throw new ForbiddenException(
-        'You can only update your own timeline events',
-      );
-    }
+  async update(id: number, updateDto: UpdateTimelineEventDto) {
+    const event = (await this.findOne(id)) as { userUuid: string };
 
     const updated = await this.prisma.timelineEvent.update({
       where: { id },
       data: updateDto,
     });
-    await this.invalidateCaches(userId);
+    await this.invalidateCaches(event.userUuid);
     return updated;
   }
 

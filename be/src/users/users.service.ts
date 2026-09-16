@@ -518,13 +518,19 @@ export class UsersService implements OnModuleInit {
     const { email, password, fullName, avatar, phone, metadata } =
       createUserDto;
 
-    // Kiểm tra email đã tồn tại chưa
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email },
-    });
+    const normalizedPhone = phone?.trim() || undefined;
+    const [existingUser, existingPhone] = await Promise.all([
+      this.prisma.user.findUnique({ where: { email } }),
+      normalizedPhone
+        ? this.prisma.user.findUnique({ where: { phone: normalizedPhone } })
+        : null,
+    ]);
 
     if (existingUser) {
       throw new ConflictException('Email đã được sử dụng');
+    }
+    if (existingPhone) {
+      throw new ConflictException('Số điện thoại đã được sử dụng');
     }
 
     // Hash password
@@ -532,37 +538,50 @@ export class UsersService implements OnModuleInit {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Tạo user mới với status ACTIVE (admin tạo thì active ngay)
-    const newUser = await this.prisma.createUserWithUniqueId((id) =>
-      this.prisma.user.create({
-        data: {
-          id,
-          email,
-          password: hashedPassword,
-          fullName,
-          avatar,
-          phone,
-          metadata: metadata ? (metadata as any) : {},
-          status: 'ACTIVE',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          avatar: true,
-          phone: true,
-          metadata: true,
-          role: true,
-          status: true,
-          googleId: true,
-          typeAuth: true,
-          createdAt: true,
-          updatedAt: true,
-          password: false,
-        },
-      }),
-    );
+    let newUser: UserWithoutPassword;
+    try {
+      newUser = await this.prisma.createUserWithUniqueId((id) =>
+        this.prisma.user.create({
+          data: {
+            id,
+            email,
+            password: hashedPassword,
+            fullName,
+            avatar,
+            phone: normalizedPhone,
+            metadata: metadata ? (metadata as any) : {},
+            status: 'ACTIVE',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            avatar: true,
+            phone: true,
+            metadata: true,
+            role: true,
+            status: true,
+            googleId: true,
+            typeAuth: true,
+            createdAt: true,
+            updatedAt: true,
+            password: false,
+          },
+        }),
+      );
+    } catch (error) {
+      const prismaError = error as { code?: string; meta?: unknown };
+      const constraint = JSON.stringify(prismaError.meta ?? '');
+      if (prismaError.code === 'P2002' && constraint.includes('phone')) {
+        throw new ConflictException('Số điện thoại đã được sử dụng');
+      }
+      if (prismaError.code === 'P2002' && constraint.includes('email')) {
+        throw new ConflictException('Email đã được sử dụng');
+      }
+      throw error;
+    }
 
     await this.invalidateListCaches();
     return newUser;

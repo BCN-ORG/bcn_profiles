@@ -25,9 +25,10 @@ import { User } from '../auth/decorators/user.decorator';
 export class TimelineEventsController {
   constructor(private readonly timelineEventsService: TimelineEventsService) {}
 
-  @Post()
+  @Post('users/:userId')
+  @Roles(Role.ADMIN)
   create(
-    @User('id') userId: string,
+    @Param('userId') userId: string,
     @Body() createDto: CreateTimelineEventDto,
   ) {
     return this.timelineEventsService.create(userId, createDto);
@@ -55,12 +56,12 @@ export class TimelineEventsController {
   }
 
   @Patch(':id')
+  @Roles(Role.ADMIN)
   update(
     @Param('id', ParseIntPipe) id: number,
-    @User('id') userId: string,
     @Body() updateDto: UpdateTimelineEventDto,
   ) {
-    return this.timelineEventsService.update(id, userId, updateDto);
+    return this.timelineEventsService.update(id, updateDto);
   }
 
   @Delete(':id')

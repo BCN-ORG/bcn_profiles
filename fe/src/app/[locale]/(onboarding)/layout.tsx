@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import {
   RequireAuth,
   useAuth,
@@ -11,6 +12,7 @@ import { ThemeToggle } from '@/components/theme/theme-provider';
 import { OnboardingSteps } from '@/components/layout/onboarding-steps';
 import { usePathname, useRouter } from '@/i18n/navigation';
 import { needsOnboarding } from '@/lib/onboarding';
+import { Button } from '@/components/ui/primitives';
 
 function stepFromPath(pathname: string) {
   if (pathname.includes('/ready')) return 4;
@@ -32,10 +34,11 @@ export default function OnboardingLayout({
 }
 
 function OnboardingShell({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations('welcome');
+  const [leaving, setLeaving] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -45,6 +48,12 @@ function OnboardingShell({ children }: { children: ReactNode }) {
   }, [user, pathname, router]);
 
   if (!user) return null;
+
+  async function backToLogin() {
+    setLeaving(true);
+    await signOut();
+    router.replace('/login');
+  }
 
   return (
     <main className="auth-canvas min-h-[100dvh]">
@@ -66,6 +75,23 @@ function OnboardingShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <div className="animate-enter mx-auto max-w-lg px-6 py-10 pb-20">
+        <Button
+          type="button"
+          variant="ghost"
+          className="-ml-3 mb-4 min-h-11 text-muted-foreground hover:text-foreground"
+          disabled={leaving}
+          onClick={() => void backToLogin()}
+        >
+          {leaving ? (
+            <Loader2
+              className="size-4 animate-spin motion-reduce:animate-none"
+              aria-hidden
+            />
+          ) : (
+            <ArrowLeft className="size-4" aria-hidden />
+          )}
+          {leaving ? t('returningToLogin') : t('backToLogin')}
+        </Button>
         <p className="mb-6 text-center text-sm text-muted-foreground">
           {t('guided')}
         </p>

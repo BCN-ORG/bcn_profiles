@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useStatusLabel } from '@/hooks/use-status-label';
 import { Button, PageHeader, StatusBadge } from '@/components/ui/primitives';
 import { formatDate } from '@/lib/utils';
@@ -15,6 +16,9 @@ import {
   membershipService,
   securityService,
   rbacService,
+  timelineService,
+  TIMELINE_EVENT_TYPES,
+  type TimelineEventType,
 } from '@/services';
 import { Link, useRouter } from '@/i18n/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { PageShell } from '@/components/layout/page-shell';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Table,
   TableBody,
@@ -44,6 +49,7 @@ export default function AdminUserDetailPage() {
   const tc = useTranslations('common');
   const tm = useTranslations('membership');
   const ts = useTranslations('security');
+  const tt = useTranslations('timeline');
   const label = useStatusLabel();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -80,6 +86,13 @@ export default function AdminUserDetailPage() {
   const [expiresAt, setExpiresAt] = useState('');
   const [appCode, setAppCode] = useState('');
   const [roleCode, setRoleCode] = useState('');
+  const [timelineEventType, setTimelineEventType] =
+    useState<TimelineEventType>('JOIN_BCN');
+  const [timelineTitle, setTimelineTitle] = useState('');
+  const [timelineBusy, setTimelineBusy] = useState(false);
+  const [editingTimelineId, setEditingTimelineId] = useState<number | null>(
+    null,
+  );
   const selectedApp = appCatalog.data?.find((app) => app.code === appCode);
 
   useEffect(() => {
@@ -134,6 +147,33 @@ export default function AdminUserDetailPage() {
       toast.success(t('updated'));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tc('error'));
+    }
+  }
+
+  async function submitTimelineEvent(event: FormEvent) {
+    event.preventDefault();
+    const isEditing = editingTimelineId !== null;
+    setTimelineBusy(true);
+    try {
+      const body = {
+        eventType: timelineEventType,
+        title: timelineTitle.trim(),
+      };
+      if (isEditing && editingTimelineId !== null) {
+        await timelineService.update(editingTimelineId, body);
+      } else {
+        await timelineService.createForUser(userId, body);
+      }
+      setTimelineTitle('');
+      setEditingTimelineId(null);
+      await queryClient.invalidateQueries({
+        queryKey: ['admin', 'user', userId],
+      });
+      toast.success(tt(isEditing ? 'updated' : 'created'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : tc('error'));
+    } finally {
+      setTimelineBusy(false);
     }
   }
 
@@ -197,21 +237,29 @@ export default function AdminUserDetailPage() {
             >
               {tc('recheck')}
             </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (!window.confirm(t('deleteConfirm'))) return;
-                void adminUserService
+            <ConfirmDialog
+              title={t('deleteTitle', {
+                user: user.data.fullName || user.data.email,
+              })}
+              description={t('deleteConfirm')}
+              confirmLabel={t('deleteUser')}
+              cancelLabel={tc('cancel')}
+              pendingLabel={tc('loading')}
+              onConfirm={() =>
+                adminUserService
                   .remove(userId)
                   .then(() => {
                     toast.success(t('deleted'));
                     router.replace('/admin/users');
+                    return true;
                   })
-                  .catch((e: Error) => toast.error(e.message));
-              }}
-            >
-              {t('deleteUser')}
-            </Button>
+                  .catch((e: Error) => {
+                    toast.error(e.message);
+                    return false;
+                  })
+              }
+              trigger={<Button variant="danger">{t('deleteUser')}</Button>}
+            />
           </div>
         </CardContent>
       </Card>
@@ -467,6 +515,166 @@ export default function AdminUserDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{tt('adminTitle')}</CardTitle>
+          <p className="text-sm leading-6 text-muted-foreground">
+            {tt('adminHint')}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <form
+            className="grid gap-4 rounded-xl border border-border/70 bg-muted/20 p-4 md:grid-cols-[minmax(180px,0.8fr)_minmax(260px,2fr)_auto] md:items-end"
+            onSubmit={submitTimelineEvent}
+          >
+            <div className="space-y-2">
+              <Label>{tt('type')}</Label>
+              <Select
+                value={timelineEventType}
+                onValueChange={(value) =>
+                  setTimelineEventType(value as TimelineEventType)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMELINE_EVENT_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {tt(`events.${type}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="timeline-title">{tt('eventTitle')}</Label>
+              <Input
+                id="timeline-title"
+                required
+                minLength={2}
+                maxLength={200}
+                value={timelineTitle}
+                placeholder={tt('titlePlaceholder')}
+                onChange={(event) => setTimelineTitle(event.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              {editingTimelineId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={timelineBusy}
+                  onClick={() => {
+                    setEditingTimelineId(null);
+                    setTimelineTitle('');
+                  }}
+                >
+                  {tc('cancel')}
+                </Button>
+              ) : null}
+              <Button
+                type="submit"
+                disabled={timelineBusy || !timelineTitle.trim()}
+              >
+                {timelineBusy
+                  ? tc('loading')
+                  : tt(editingTimelineId ? 'saveChanges' : 'add')}
+              </Button>
+            </div>
+          </form>
+
+          {(user.data.timelineEvents?.length ?? 0) === 0 ? (
+            <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+              {tt('empty')}
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border/70">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{tt('type')}</TableHead>
+                    <TableHead>{tt('eventTitle')}</TableHead>
+                    <TableHead>{tt('when')}</TableHead>
+                    <TableHead className="w-24">
+                      <span className="sr-only">{tc('actions')}</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {user.data.timelineEvents?.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium text-primary">
+                        {tt(`events.${item.eventType}`)}
+                      </TableCell>
+                      <TableCell>{item.title}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatDate(item.createdAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={tt('editAction')}
+                            onClick={() => {
+                              setEditingTimelineId(item.id);
+                              setTimelineEventType(item.eventType);
+                              setTimelineTitle(item.title);
+                            }}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <ConfirmDialog
+                            title={tt('deleteTitle')}
+                            description={tt('deleteConfirm', {
+                              title: item.title,
+                            })}
+                            confirmLabel={tt('deleteAction')}
+                            cancelLabel={tc('cancel')}
+                            pendingLabel={tc('loading')}
+                            onConfirm={() =>
+                              timelineService
+                                .remove(item.id)
+                                .then(async () => {
+                                  if (editingTimelineId === item.id) {
+                                    setEditingTimelineId(null);
+                                    setTimelineTitle('');
+                                  }
+                                  await queryClient.invalidateQueries({
+                                    queryKey: ['admin', 'user', userId],
+                                  });
+                                  toast.success(tt('deleted'));
+                                  return true;
+                                })
+                                .catch((error: Error) => {
+                                  toast.error(error.message);
+                                  return false;
+                                })
+                            }
+                            trigger={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={tt('deleteAction')}
+                              >
+                                <Trash2 className="size-4" />
+                              </Button>
+                            }
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

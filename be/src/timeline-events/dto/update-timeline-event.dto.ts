@@ -1,4 +1,11 @@
-import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
+import {
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { EventType } from './create-timeline-event.dto';
 
 export class UpdateTimelineEventDto {
@@ -8,6 +15,8 @@ export class UpdateTimelineEventDto {
 
   @IsString()
   @IsOptional()
+  @MinLength(2)
+  @MaxLength(200)
   title?: string;
 
   @IsObject()

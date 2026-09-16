@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { MessageCircle } from 'lucide-react';
+import { CircleAlert, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import { Button, StatusBadge } from '@/components/ui/primitives';
@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function WelcomeDiscordPage() {
   const t = useTranslations('welcome');
@@ -27,6 +28,7 @@ export default function WelcomeDiscordPage() {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [oauthMissing, setOauthMissing] = useState(false);
+  const identityAlreadyLinked = search.get('oauth') === 'already_linked';
 
   const identities = useQuery({
     queryKey: ['me', 'identities'],
@@ -51,6 +53,8 @@ export default function WelcomeDiscordPage() {
       toast.success(t('discordLinked'));
       void queryClient.invalidateQueries({ queryKey: ['me', 'identities'] });
       void queryClient.invalidateQueries({ queryKey: ['me', 'membership'] });
+    } else if (oauth === 'already_linked') {
+      toast.error(t('oauthAlreadyLinked', { provider: 'Discord' }));
     } else if (oauth === 'failed') {
       toast.error(t('oauthFailed'));
     }
@@ -103,6 +107,17 @@ export default function WelcomeDiscordPage() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {identityAlreadyLinked ? (
+          <Alert variant="destructive" className="p-4">
+            <CircleAlert aria-hidden />
+            <AlertTitle>
+              {t('oauthAlreadyLinkedTitle', { provider: 'Discord' })}
+            </AlertTitle>
+            <AlertDescription>
+              {t('oauthAlreadyLinked', { provider: 'Discord' })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <SurfacePanel className="space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{t('discordStatus')}</span>

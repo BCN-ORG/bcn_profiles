@@ -153,7 +153,9 @@ export class ExternalIdentitiesController {
             ? 'not_linked'
             : errorCode === 'ACCOUNT_BLOCKED'
               ? 'blocked'
-              : 'failed';
+              : errorCode === 'IDENTITY_ALREADY_LINKED'
+                ? 'already_linked'
+                : 'failed';
         const flow: 'login' | 'link' =
           errorCode === 'IDENTITY_ALREADY_LINKED' ? 'link' : 'login';
         redirectBrowser(this.oauthFrontendPath(provider, status, flow));
@@ -190,6 +192,7 @@ export class ExternalIdentitiesController {
     const useWelcome =
       flow === 'link' &&
       (status === 'linked' ||
+        status === 'already_linked' ||
         status === 'cancelled' ||
         status === 'incomplete' ||
         status === 'failed');

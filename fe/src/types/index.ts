@@ -1,3 +1,10 @@
+export type TimelineEventType =
+  | 'JOIN_BCN'
+  | 'COURSE_COMPLETE'
+  | 'QUIZ_COMPLETE'
+  | 'PROJECT_COMPLETE'
+  | 'SEMESTER_COMPLETE';
+
 export type User = {
   id: string;
   email: string;
@@ -8,6 +15,13 @@ export type User = {
   status?: 'PENDING' | 'ACTIVE' | 'BLOCKED' | 'DISABLED';
   createdAt?: string;
   twoFactorEnabled?: boolean;
+  timelineEvents?: Array<{
+    id: number;
+    eventType: TimelineEventType;
+    title: string;
+    metadata?: unknown;
+    createdAt: string;
+  }>;
   metadata?: {
     onboardingVersion?: number;
     maSV?: string;

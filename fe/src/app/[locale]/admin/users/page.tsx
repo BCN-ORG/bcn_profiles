@@ -143,7 +143,7 @@ export default function AdminUsersPage() {
                 <TableHead>{t('userColumn')}</TableHead>
                 <TableHead>{t('role')}</TableHead>
                 <TableHead>{t('status')}</TableHead>
-                <TableHead>{t('created')}</TableHead>
+                <TableHead>{t('createdAt')}</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>

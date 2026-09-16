@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { Link2 } from 'lucide-react';
+import { CircleAlert, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import { Button, StatusBadge } from '@/components/ui/primitives';
@@ -17,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const OPTIONAL = [
   { id: 'GOOGLE', label: 'Google' },
@@ -31,6 +32,14 @@ export default function WelcomeOptionalPage() {
   const search = useSearchParams();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
+  const callbackProvider = search.get('provider');
+  const callbackProviderLabel =
+    OPTIONAL.find(
+      (item) => item.id.toLowerCase() === callbackProvider?.toLowerCase(),
+    )?.label ||
+    callbackProvider ||
+    'OAuth';
+  const identityAlreadyLinked = search.get('oauth') === 'already_linked';
 
   const identities = useQuery({
     queryKey: ['me', 'identities'],
@@ -39,17 +48,24 @@ export default function WelcomeOptionalPage() {
 
   useEffect(() => {
     const oauth = search.get('oauth');
-    const provider = search.get('provider');
     if (!oauth) return;
     if (oauth === 'cancelled' || oauth === 'incomplete') {
-      toast.message(t('oauthCancelled', { provider: provider || 'OAuth' }));
+      toast.message(
+        t('oauthCancelled', { provider: callbackProviderLabel }),
+      );
     } else if (oauth === 'linked') {
-      toast.success(t('providerLinked', { provider: provider || '' }));
+      toast.success(
+        t('providerLinked', { provider: callbackProviderLabel }),
+      );
       void queryClient.invalidateQueries({ queryKey: ['me', 'identities'] });
+    } else if (oauth === 'already_linked') {
+      toast.error(
+        t('oauthAlreadyLinked', { provider: callbackProviderLabel }),
+      );
     } else if (oauth === 'failed') {
       toast.error(t('oauthFailed'));
     }
-  }, [search, t, queryClient]);
+  }, [search, t, queryClient, callbackProviderLabel]);
 
   async function connect(provider: string, label: string) {
     setBusy(provider);
@@ -84,6 +100,19 @@ export default function WelcomeOptionalPage() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {identityAlreadyLinked ? (
+          <Alert variant="destructive" className="p-4">
+            <CircleAlert aria-hidden />
+            <AlertTitle>
+              {t('oauthAlreadyLinkedTitle', {
+                provider: callbackProviderLabel,
+              })}
+            </AlertTitle>
+            <AlertDescription>
+              {t('oauthAlreadyLinked', { provider: callbackProviderLabel })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         <div className="space-y-3">
           {OPTIONAL.map((provider) => {
             const linked = identities.data?.some(

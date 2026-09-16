@@ -4,8 +4,8 @@
 > **Reading:** B2B SaaS Account Center for BCN members — Linear-clean / trust-first — shadcn + Plus Jakarta Sans.
 
 ## Dials
-- Variance: **5** (balanced, not chaotic)
-- Motion: **4** (subtle CSS only; respect `prefers-reduced-motion`)
+- Variance: **4** (predictable hierarchy with restrained asymmetry)
+- Motion: **3** (interaction feedback only; respect `prefers-reduced-motion`)
 - Density: **6** (product UI, not marketing air)
 
 ## Palette (locked — no AI purple)
@@ -31,9 +31,9 @@ Cool zinc neutrals + **one** emerald accent for trust / membership / success.
 - Labels: `text-xs tracking-wide text-muted-foreground`
 
 ## Surfaces
-- Soft Structuralism: airy bg, floating cards with **tinted** shadow + hairline ring
-- Double-bezel on auth cards: outer `p-1.5 ring-1` shell → inner Card
-- Radius: outer `1rem`, inner `calc(1rem - 6px)`
+- Flat structural surfaces: solid canvas, visible hairline borders, shadow only where elevation is meaningful
+- Avoid decorative blur and gradients in product UI
+- Radius: `0.75rem` for containers, `0.5rem` for controls
 
 ## Motion
 - Interactive: `150–250ms` `cubic-bezier(0.32, 0.72, 0, 1)`

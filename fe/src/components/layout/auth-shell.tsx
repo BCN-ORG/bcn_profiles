@@ -30,16 +30,16 @@ export function AuthShell({
 
   return (
     <div className="auth-canvas relative min-h-[100dvh]">
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-1">
         <ThemeToggle />
         <LocaleSwitcher />
       </div>
 
-      <div className="mx-auto grid min-h-[100dvh] w-full max-w-6xl lg:grid-cols-[1fr_minmax(0,420px)] lg:gap-16 lg:px-8">
-        {/* Hero — desktop */}
-        <section className="hidden flex-col justify-center px-6 py-16 lg:flex lg:px-0 lg:py-24">
+      <div className="mx-auto grid min-h-[100dvh] w-full max-w-7xl lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-20 lg:px-10">
+        {/* Desktop product story */}
+        <section className="hidden flex-col justify-center px-6 py-16 lg:flex lg:px-0 lg:py-20">
           <div className="animate-enter mb-10 flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-2xl bg-success font-bold text-success-foreground shadow-lg shadow-success/25">
+            <span className="flex size-11 items-center justify-center rounded-xl bg-success font-bold text-success-foreground shadow-sm">
               B
             </span>
             <div>
@@ -49,7 +49,7 @@ export function AuthShell({
           </div>
 
           <div className="animate-enter animate-enter-delay-1 space-y-5">
-            <h1 className="max-w-[14ch] text-[2.75rem] leading-[1.05] font-semibold tracking-tight text-balance">
+            <h1 className="max-w-[15ch] text-[3rem] leading-[1.08] font-semibold tracking-[-0.035em] text-balance xl:text-[3.5rem]">
               {tb('tagline')}
             </h1>
             <p className="max-w-md text-base leading-relaxed text-muted-foreground">
@@ -57,13 +57,13 @@ export function AuthShell({
             </p>
           </div>
 
-          <ul className="animate-enter animate-enter-delay-2 mt-12 space-y-4">
+          <ul className="animate-enter animate-enter-delay-2 mt-12 grid max-w-2xl gap-px overflow-hidden rounded-xl border border-border bg-border">
             {FEATURES.map(({ icon: Icon, key }) => (
               <li
                 key={key}
-                className="flex items-start gap-3 rounded-2xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm"
+                className="flex items-start gap-3 bg-card p-4"
               >
-                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-success/10 text-success">
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
                   <Icon className="size-4" aria-hidden />
                 </span>
                 <div>
@@ -81,7 +81,7 @@ export function AuthShell({
         <div className="flex flex-col justify-center px-4 py-16 sm:px-6 lg:px-0 lg:py-24">
           {/* Mobile brand */}
           <div className="animate-enter mb-8 flex items-center gap-3 lg:hidden">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-success font-bold text-success-foreground">
+            <span className="flex size-10 items-center justify-center rounded-lg bg-success font-bold text-success-foreground">
               B
             </span>
             <div>
@@ -110,7 +110,7 @@ export function AuthShell({
                 ) : null}
               </header>
             )}
-            <div className="auth-panel rounded-3xl p-6 sm:p-8">{children}</div>
+            <div className="auth-panel rounded-xl p-6 sm:p-8">{children}</div>
           </div>
         </div>
       </div>
@@ -124,7 +124,7 @@ export function AuthDivider({ label }: { label: string }) {
       <div className="absolute inset-0 flex items-center">
         <span className="w-full border-t border-border/80" />
       </div>
-      <p className="relative mx-auto w-fit bg-transparent px-3 text-xs text-muted-foreground">
+      <p className="relative mx-auto w-fit bg-card px-3 text-xs text-muted-foreground">
         {label}
       </p>
     </div>

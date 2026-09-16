@@ -6,11 +6,22 @@ import type {
   User,
   UserApplication,
   UserSession,
+  TimelineEventType,
 } from '@/types';
+
+export const TIMELINE_EVENT_TYPES = [
+  'JOIN_BCN',
+  'COURSE_COMPLETE',
+  'QUIZ_COMPLETE',
+  'PROJECT_COMPLETE',
+  'SEMESTER_COMPLETE',
+] as const satisfies readonly TimelineEventType[];
+
+export type { TimelineEventType } from '@/types';
 
 export type TimelineEvent = {
   id: number;
-  eventType: string;
+  eventType: TimelineEventType;
   title: string;
   metadata?: unknown;
   createdAt: string;
@@ -238,6 +249,7 @@ export type RbacApplication = {
     code: string;
     name: string | null;
     description?: string | null;
+    isSystem?: boolean;
     deprecated?: boolean;
     permissions: {
       permission: { id: string; code: string; description?: string | null };
@@ -347,10 +359,14 @@ export const timelineService = {
     request.get<TimelineEvent[]>(
       `/timeline-events/my-timeline?page=${page}&limit=${limit}`,
     ),
-  create: (body: {
-    eventType: string;
+  createForUser: (userId: string, body: {
+    eventType: TimelineEventType;
     title: string;
     metadata?: Record<string, unknown>;
-  }) => request.post<TimelineEvent>('/timeline-events', body),
+  }) => request.post<TimelineEvent>(`/timeline-events/users/${userId}`, body),
+  update: (
+    id: number,
+    body: Partial<Pick<TimelineEvent, 'eventType' | 'title' | 'metadata'>>,
+  ) => request.patch<TimelineEvent>(`/timeline-events/${id}`, body),
   remove: (id: number) => request.delete(`/timeline-events/${id}`),
 };

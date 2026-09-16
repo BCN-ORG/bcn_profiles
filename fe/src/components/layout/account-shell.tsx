@@ -104,10 +104,10 @@ function NavGroup({
                   asChild
                   isActive={active}
                   className={cn(
-                    'relative h-10 rounded-xl px-3 font-medium transition-[background,color,box-shadow] duration-200 ease-premium',
+                    'relative h-10 rounded-lg px-3 font-medium transition-[background,color] duration-200 ease-premium',
                     active
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-primary/15'
-                      : 'text-muted-foreground hover:text-foreground',
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
                   )}
                 >
                   <Link href={item.href}>
@@ -162,18 +162,23 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
+      <a
+        href="#main-content"
+        className="fixed top-3 left-3 z-50 -translate-y-20 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background shadow-lg transition-transform focus:translate-y-0"
+      >
+        {tc('skipContent')}
+      </a>
       <Sidebar
         collapsible="icon"
-        className="border-r border-sidebar-border/80 bg-sidebar/90 backdrop-blur-xl"
+        className="border-r border-sidebar-border bg-sidebar"
       >
-        <SidebarHeader className="gap-0 border-b border-sidebar-border/60 px-3 py-4">
+        <SidebarHeader className="gap-0 border-b border-sidebar-border px-3 py-4">
           <Link
             href="/"
-            className="flex items-center gap-3 rounded-2xl px-1 py-0.5 outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex items-center gap-3 rounded-lg px-1 py-0.5 outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary font-bold text-primary-foreground shadow-md shadow-primary/25">
-              <span className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/25 to-transparent" />
-              <span className="relative text-sm tracking-tight">B</span>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground shadow-sm">
+              <span className="text-sm tracking-tight">B</span>
             </span>
             <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
               <strong className="block truncate text-sm font-semibold tracking-tight">
@@ -211,16 +216,16 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-sidebar-border/60 p-3">
-          <div className="flex items-center gap-2.5 rounded-2xl bg-muted/40 p-2 ring-1 ring-border/50 transition-colors group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-1.5">
+        <SidebarFooter className="border-t border-sidebar-border p-3">
+          <div className="flex items-center gap-2.5 rounded-lg p-1.5 transition-colors group-data-[collapsible=icon]:justify-center">
             <Avatar
               size="sm"
-              className="size-9 shrink-0 rounded-xl after:rounded-xl"
+              className="size-9 shrink-0 rounded-lg after:rounded-lg"
             >
               {user.avatar ? (
-                <AvatarImage src={user.avatar} alt="" className="rounded-xl" />
+                <AvatarImage src={user.avatar} alt="" className="rounded-lg" />
               ) : null}
-              <AvatarFallback className="rounded-xl bg-primary/12 text-xs font-semibold text-primary">
+              <AvatarFallback className="rounded-lg bg-primary/12 text-xs font-semibold text-primary">
                 {initials(user.fullName)}
               </AvatarFallback>
             </Avatar>
@@ -246,22 +251,22 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="min-h-svh bg-transparent">
-        <header className="sticky top-0 z-20 border-b border-border/50 bg-background/70 backdrop-blur-xl">
-          <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 md:px-8">
-            <SidebarTrigger className="size-9 rounded-xl" />
+      <SidebarInset id="main-content" className="min-h-svh bg-background">
+        <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-md">
+          <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 md:px-8 lg:px-10">
+            <SidebarTrigger className="size-9 rounded-lg" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold tracking-tight">
                 {pageTitle}
               </p>
             </div>
-            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-card/80 p-1 shadow-sm">
+            <div className="flex items-center gap-1">
               <ThemeToggle />
               <LocaleSwitcher />
               <Button
                 variant="ghost"
                 size="sm"
-                className="hidden h-8 rounded-full px-3 sm:inline-flex"
+                className="hidden h-8 px-3 sm:inline-flex"
                 onClick={() => void logout()}
               >
                 <LogOut className="size-3.5" aria-hidden />
@@ -270,7 +275,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
-        <div className="relative mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-8 md:py-8">
+        <div className="relative mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-8 md:py-8 lg:px-10 lg:py-10">
           {children}
         </div>
       </SidebarInset>

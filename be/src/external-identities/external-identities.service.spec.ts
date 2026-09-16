@@ -2,6 +2,20 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { ExternalIdentitiesService } from './external-identities.service';
 
 describe('ExternalIdentitiesService', () => {
+  const previousEncryptionKey = process.env.TOTP_ENCRYPTION_KEY;
+
+  beforeAll(() => {
+    process.env.TOTP_ENCRYPTION_KEY = 'test-encryption-key';
+  });
+
+  afterAll(() => {
+    if (previousEncryptionKey === undefined) {
+      delete process.env.TOTP_ENCRYPTION_KEY;
+    } else {
+      process.env.TOTP_ENCRYPTION_KEY = previousEncryptionKey;
+    }
+  });
+
   function createService(findUnique: jest.Mock) {
     const values = new Map<string, string>();
     const redis = {
@@ -74,6 +88,25 @@ describe('ExternalIdentitiesService', () => {
     await expect(
       service.callback('google', state, 'provider-code'),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('maps a concurrent unique conflict to identity already linked', async () => {
+    const service = createService(jest.fn().mockResolvedValue(null));
+    const prisma = (service as any).prisma as {
+      externalIdentity: { create: jest.Mock };
+    };
+    prisma.externalIdentity.create.mockRejectedValue({ code: 'P2002' });
+    const { authorizationUrl: state } = await service.begin(
+      'google',
+      'link',
+      'user-a',
+    );
+
+    await expect(
+      service.callback('google', state, 'provider-code'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'IDENTITY_ALREADY_LINKED' }),
+    });
   });
 
   it('rejects reuse of an OAuth state value', async () => {

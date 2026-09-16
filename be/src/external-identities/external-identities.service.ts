@@ -175,27 +175,37 @@ export class ExternalIdentitiesService {
         code: 'IDENTITY_ALREADY_LINKED',
         message: `${provider} is already connected`,
       });
-    const linked = await this.prisma.externalIdentity.create({
-      data: {
-        id: randomUUID(),
-        userId,
-        provider,
-        providerSubject: identity.subject,
-        providerEmail: identity.email,
-        providerUsername: identity.username,
-        providerDisplayName: identity.displayName,
-        providerAvatarUrl: identity.avatarUrl,
-        profileData: identity.profileData,
-        accessTokenEncrypted: encryptSecret(token.access_token),
-        refreshTokenEncrypted: token.refresh_token
-          ? encryptSecret(token.refresh_token)
-          : null,
-        tokenExpiresAt: token.expires_in
-          ? new Date(Date.now() + token.expires_in * 1000)
-          : null,
-        lastSyncedAt: new Date(),
-      },
-    });
+    const linked = await this.prisma.externalIdentity
+      .create({
+        data: {
+          id: randomUUID(),
+          userId,
+          provider,
+          providerSubject: identity.subject,
+          providerEmail: identity.email,
+          providerUsername: identity.username,
+          providerDisplayName: identity.displayName,
+          providerAvatarUrl: identity.avatarUrl,
+          profileData: identity.profileData,
+          accessTokenEncrypted: encryptSecret(token.access_token),
+          refreshTokenEncrypted: token.refresh_token
+            ? encryptSecret(token.refresh_token)
+            : null,
+          tokenExpiresAt: token.expires_in
+            ? new Date(Date.now() + token.expires_in * 1000)
+            : null,
+          lastSyncedAt: new Date(),
+        },
+      })
+      .catch((error: unknown) => {
+        if ((error as { code?: string }).code === 'P2002') {
+          throw new ConflictException({
+            code: 'IDENTITY_ALREADY_LINKED',
+            message: 'External account is already linked to a BCN account',
+          });
+        }
+        throw error;
+      });
     await this.authorization.audit(
       userId,
       `${provider}_LINKED`,
