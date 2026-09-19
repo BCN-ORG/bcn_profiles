@@ -13,12 +13,15 @@ import { encryptSecret, decryptSecret } from '../auth/utils/secret-crypto';
 import { AuthorizationService } from '../authorization/authorization.service';
 import { ExternalProviderService } from './provider.service';
 import { MembershipService } from '../membership/membership.service';
+import { sanitizeOauthReturnTo } from '../oauth/oauth-return.util';
 
 type OAuthState = {
   flow: 'link' | 'login';
   provider: ExternalProvider;
   userId?: string;
   codeVerifier?: string;
+  /** Profiles `/oauth/authorize?...` to resume after social login. */
+  returnTo?: string;
 };
 
 @Injectable()
@@ -47,7 +50,12 @@ export class ExternalIdentitiesService {
     });
   }
 
-  async begin(providerName: string, flow: 'link' | 'login', userId?: string) {
+  async begin(
+    providerName: string,
+    flow: 'link' | 'login',
+    userId?: string,
+    returnTo?: string,
+  ) {
     const provider = this.parseProvider(providerName);
     if (flow === 'link' && !userId) throw new UnauthorizedException();
     if (flow === 'link') {
@@ -63,9 +71,17 @@ export class ExternalIdentitiesService {
     const state = randomBytes(32).toString('base64url');
     const codeVerifier =
       provider === 'ZALO' ? this.zaloCodeVerifier() : undefined;
+    const safeReturnTo =
+      flow === 'login' ? sanitizeOauthReturnTo(returnTo) : undefined;
     await this.redis.setJson(
       `oauth_state:${this.hash(state)}`,
-      { flow, provider, userId, codeVerifier } satisfies OAuthState,
+      {
+        flow,
+        provider,
+        userId,
+        codeVerifier,
+        ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
+      } satisfies OAuthState,
       10 * 60 * 1000,
     );
     return {
@@ -152,7 +168,11 @@ export class ExternalIdentitiesService {
         undefined,
         { provider },
       );
-      return { flow: 'login' as const, user: linked.user };
+      return {
+        flow: 'login' as const,
+        user: linked.user,
+        returnTo: saved.returnTo,
+      };
     }
 
     const userId = saved.userId!;

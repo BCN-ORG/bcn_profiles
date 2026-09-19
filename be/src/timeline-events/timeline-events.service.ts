@@ -160,6 +160,40 @@ export class TimelineEventsService implements OnModuleInit {
     }
   }
 
+  async lookupUsersFromApplication(
+    authorization: string | undefined,
+    idsRaw?: string,
+  ) {
+    await this.authenticateApplication(authorization);
+    const ids = [
+      ...new Set(
+        (idsRaw ?? '')
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean),
+      ),
+    ].slice(0, 100);
+    if (!ids.length) return { users: [] };
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        avatar: true,
+      },
+    });
+    return {
+      users: users.map((user) => ({
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        avatarUrl: user.avatar,
+      })),
+    };
+  }
+
   private async authenticateApplication(header: string | undefined) {
     const match = header?.match(/^Basic (\S+)$/i);
     if (!match) {

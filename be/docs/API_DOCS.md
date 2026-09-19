@@ -1144,7 +1144,7 @@ Tìm kiếm user theo tên hoặc email. Trả tối đa 20 kết quả.
 
 Lấy danh sách toàn bộ users với phân trang, sắp xếp và tìm kiếm. Kèm 5 timeline event gần nhất của mỗi user.
 
-**Auth:** JWT cookie + ADMIN  
+**Auth:** JWT cookie + ADMIN
 **Query:**
 
 | Param    | Default     | Mô tả                                                                       |
@@ -1613,7 +1613,7 @@ Backend chỉ nhận avatar thuộc folder của user hiện tại và URL khớ
 
 ## 📅 Timeline Events
 
-Tất cả endpoints đều yêu cầu **JWT cookie**.
+Các endpoint đọc yêu cầu **JWT cookie**. Endpoint ghi cho application dùng Basic credentials; admin có endpoint riêng để tạo/sửa/xóa.
 
 **Các loại event (`eventType`):**
 
@@ -1627,18 +1627,20 @@ Tất cả endpoints đều yêu cầu **JWT cookie**.
 
 ---
 
-### POST `/timeline-events`
+### POST `/internal/timeline-events`
 
-Tạo timeline event mới cho bản thân.
+Application ghi timeline cho user theo luồng server-to-server.
 
-**Auth:** JWT cookie
+**Auth:** `Authorization: Basic <base64(clientId:clientSecret)>`
 
 **Request Body:**
 
 ```json
 {
+  "userId": "user-uuid",
   "eventType": "COURSE_COMPLETE",
   "title": "Hoàn thành khóa NestJS",
+  "idempotencyKey": "quiz:course:njs101:user-uuid",
   "metadata": {
     "courseId": "NJS101",
     "score": 95,
@@ -1655,10 +1657,20 @@ Tạo timeline event mới cho bản thân.
   "userUuid": "uuid",
   "eventType": "COURSE_COMPLETE",
   "title": "Hoàn thành khóa NestJS",
+  "sourceApp": "QUIZ",
+  "idempotencyKey": "quiz:course:njs101:user-uuid",
   "metadata": { "courseId": "NJS101", "score": 95 },
   "createdAt": "2026-01-01T00:00:00.000Z"
 }
 ```
+
+Retry với cùng `idempotencyKey`, user và application trả lại event hiện có. Key dài 8-120 ký tự và chỉ gồm chữ, số, `:`, `_`, `-`. Nếu key đã thuộc user hoặc application khác, API trả `409` với code `IDEMPOTENCY_CONFLICT`.
+
+### POST `/timeline-events/users/:userId`
+
+Admin tạo timeline event cho một user. Body gồm `eventType`, `title`, `metadata?`.
+
+**Auth:** JWT cookie + ADMIN
 
 ---
 
@@ -1714,9 +1726,9 @@ Lấy chi tiết một timeline event theo ID.
 
 ### PATCH `/timeline-events/:id`
 
-Cập nhật timeline event. Chỉ được chỉnh sửa event của chính mình.
+Cập nhật timeline event.
 
-**Auth:** JWT cookie (phải là chủ sở hữu event)  
+**Auth:** JWT cookie + ADMIN
 **Params:** `id` — số nguyên
 
 **Request Body (tất cả optional):**
@@ -1733,7 +1745,7 @@ Cập nhật timeline event. Chỉ được chỉnh sửa event của chính mì
 
 **Errors:**
 
-- `403` — Cố chỉnh sửa event của người khác
+- `403` — Không có quyền ADMIN
 - `404` — Event không tồn tại
 
 ---
@@ -1765,7 +1777,7 @@ Xóa timeline event. Chỉ admin mới có quyền xóa.
 
 > **Development:** `secure: false`, không có `domain`, `sameSite: none` — cho phép cross-origin giữa các port localhost.
 
-**Production BCN:** Cookie hiện không có `Domain=.bcn.id.vn`, nên cookie Profiles không tự xác thực trên `quizzes.bcn.id.vn`. App Quiz cần đăng nhập/refresh qua proxy `/auth` của Quiz với `credentials: 'include'`; FE không đọc được cookie HttpOnly để tạo Bearer token.
+**Production BCN:** Cookie Profiles không được chia sẻ sang `quizzes.bcn.id.vn`. Quiz dùng OAuth Authorization Code + PKCE, rồi lưu token trong cookie HttpOnly riêng của Quiz; FE không đọc token bằng JavaScript.
 
 ### Token model (FE cần biết)
 

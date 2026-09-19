@@ -140,4 +140,28 @@ describe('ExternalIdentitiesService', () => {
       verifier,
     );
   });
+
+  it('stores returnTo on login begin and returns it from callback', async () => {
+    const findUnique = jest.fn().mockResolvedValue({
+      id: 'identity-1',
+      userId: 'user-1',
+      refreshTokenEncrypted: null,
+      tokenExpiresAt: null,
+      user: { id: 'user-1', status: 'ACTIVE' },
+    });
+    const service = createService(findUnique);
+    const returnTo =
+      'http://localhost:3000/api/oauth/authorize?client_id=bcn-quiz';
+    const { authorizationUrl: state } = await service.begin(
+      'google',
+      'login',
+      undefined,
+      returnTo,
+    );
+    const result = await service.callback('google', state, 'provider-code');
+    expect(result).toMatchObject({
+      flow: 'login',
+      returnTo,
+    });
+  });
 });

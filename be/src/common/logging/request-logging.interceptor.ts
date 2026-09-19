@@ -1,15 +1,13 @@
 import {
   CallHandler,
   ExecutionContext,
-  Inject,
   Injectable,
+  Logger,
   NestInterceptor,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Observable, throwError } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
-import type { Logger } from 'winston';
 
 type RequestUser = {
   id?: unknown;
@@ -27,10 +25,7 @@ type RequestUser = {
 
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
-  constructor(
-    @Inject(WINSTON_MODULE_PROVIDER)
-    private readonly logger: Logger,
-  ) {}
+  private readonly logger = new Logger(RequestLoggingInterceptor.name);
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const http = context.switchToHttp();
@@ -42,24 +37,11 @@ export class RequestLoggingInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
-        this.logRequest(
-          request,
-          method,
-          url,
-          response.statusCode,
-          Date.now() - startedAt,
-        );
+        this.logRequest(request, method, url, response.statusCode, Date.now() - startedAt);
       }),
       catchError((error: unknown) => {
         const status = this.extractStatusCode(error, response.statusCode);
-        this.logRequest(
-          request,
-          method,
-          url,
-          status,
-          Date.now() - startedAt,
-          error,
-        );
+        this.logRequest(request, method, url, status, Date.now() - startedAt);
         return throwError(() => error);
       }),
     );
@@ -71,36 +53,12 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     url: string,
     status: number,
     durationMs: number,
-    error?: unknown,
   ): void {
-    const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
-    const message =
-      error instanceof Error ? error.message : 'request_completed';
-
-    this.logger.log(level, message, {
-      user_id: this.extractUserId(request.user),
-      action: `${method} ${url}`,
-      method,
-      url,
-      status,
-      statusCode: status,
-      ip: this.extractClientIp(request),
-      duration_ms: durationMs,
-    });
-  }
-
-  private extractClientIp(request: Request): string | undefined {
-    const forwardedFor = request.headers['x-forwarded-for'];
-
-    if (typeof forwardedFor === 'string' && forwardedFor.trim().length > 0) {
-      return forwardedFor.split(',')[0].trim();
-    }
-
-    if (Array.isArray(forwardedFor) && forwardedFor.length > 0) {
-      return forwardedFor[0];
-    }
-
-    return request.ip || request.socket.remoteAddress;
+    const userId = this.extractUserId(request.user);
+    const line = `${method} ${url} ${status} ${durationMs}ms${userId ? ` user=${userId}` : ''}`;
+    if (status >= 500) this.logger.error(line);
+    else if (status >= 400) this.logger.warn(line);
+    else this.logger.log(line);
   }
 
   private extractUserId(user?: RequestUser): string | undefined {

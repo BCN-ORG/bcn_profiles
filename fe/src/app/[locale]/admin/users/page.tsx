@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
           <Label className="sr-only">{tc('search')}</Label>
           <Input
             className="max-w-xs"
-            placeholder={tc('search')}
+            placeholder={t('searchUsersPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />

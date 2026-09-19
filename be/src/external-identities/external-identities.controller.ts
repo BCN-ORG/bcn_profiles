@@ -19,6 +19,7 @@ import { User } from '../auth/decorators/user.decorator';
 import { IdentitySessionService } from '../identity/session.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExternalIdentitiesService } from './external-identities.service';
+import { sanitizeOauthReturnTo } from '../oauth/oauth-return.util';
 import { LoginDto } from '../auth/dto/login.dto';
 import { setSsoCookie } from '../common/cookies/sso-cookie';
 import { setAuthCookies } from '../common/cookies/auth-cookies';
@@ -67,8 +68,11 @@ export class ExternalIdentitiesController {
 
   @Public()
   @Get('auth/social/:provider')
-  login(@Param('provider') provider: string) {
-    return this.identities.begin(provider, 'login');
+  login(
+    @Param('provider') provider: string,
+    @Query('return_to') returnTo?: string,
+  ) {
+    return this.identities.begin(provider, 'login', undefined, returnTo);
   }
 
   @Public()
@@ -119,6 +123,7 @@ export class ExternalIdentitiesController {
         return { identity: result.identity, membership: result.membership };
       }
 
+      const resume = sanitizeOauthReturnTo(result.returnTo);
       const login = await this.auth.login(result.user);
       if (!login.skipTwoFactor) {
         if (frontend) {
@@ -128,6 +133,7 @@ export class ExternalIdentitiesController {
           });
           const token = login.setupToken || login.verificationToken;
           if (token) params.set('token', token);
+          if (resume) params.set('oauth_return', resume);
           redirectBrowser(`${frontend}/login?${params.toString()}`);
           return;
         }
@@ -139,6 +145,10 @@ export class ExternalIdentitiesController {
       setAuthCookies(response, request, tokens);
       if (tokens.sso_session_id) {
         setSsoCookie(response, request, tokens.sso_session_id);
+      }
+      if (resume) {
+        redirectBrowser(resume);
+        return;
       }
       if (frontend) {
         redirectBrowser(frontend);

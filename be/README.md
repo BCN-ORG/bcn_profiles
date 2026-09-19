@@ -189,8 +189,9 @@ npm run start:prod
 
 ## 8) Tài liệu liên quan
 
-- API docs chi tiết: [API_DOCS.md](./API_DOCS.md)
-- Hướng dẫn 2FA: [2FA_USAGE_GUIDE.md](./2FA_USAGE_GUIDE.md)
+- API docs chi tiết: [API_DOCS.md](./docs/API_DOCS.md)
+- Hướng dẫn 2FA: [2FA_USAGE_GUIDE.md](./docs/2FA_USAGE_GUIDE.md)
+- Tạo BCN client app, SSO + RBAC + Timeline: [BCN_CLIENT_APP_INTEGRATION.md](./docs/BCN_CLIENT_APP_INTEGRATION.md)
 
 ## 9) Ghi chú triển khai
 

@@ -74,6 +74,7 @@ class CreateApplicationDto {
   @IsString() name!: string;
   @IsString() clientId!: string;
   @IsOptional() @IsBoolean() require2fa?: boolean;
+  @IsOptional() @IsIn(['MANUAL', 'MEMBERS']) accessMode?: 'MANUAL' | 'MEMBERS';
   @IsOptional() @IsString() redirectUri?: string;
 }
 
@@ -82,6 +83,7 @@ class UpdateApplicationDto {
   @IsOptional() @IsString() clientId?: string;
   @IsOptional() @IsIn(['ACTIVE', 'DISABLED']) status?: 'ACTIVE' | 'DISABLED';
   @IsOptional() @IsBoolean() require2fa?: boolean;
+  @IsOptional() @IsIn(['MANUAL', 'MEMBERS']) accessMode?: 'MANUAL' | 'MEMBERS';
 }
 
 class RedirectUriDto {

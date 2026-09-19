@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import {
   ArrowUpRight,
+  AppWindow,
   BadgeCheck,
   History,
   Link2,
@@ -20,7 +21,7 @@ import {
   StatusBadge,
 } from '@/components/ui/primitives';
 import { initials } from '@/lib/utils';
-import { membershipService } from '@/services';
+import { applicationService, membershipService } from '@/services';
 import { Link } from '@/i18n/navigation';
 import {
   Card,
@@ -32,6 +33,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const QUICK_LINKS = [
+  { href: '/applications', key: 'applications', icon: AppWindow },
   { href: '/connections', key: 'connections', icon: Link2 },
   { href: '/timeline', key: 'timeline', icon: History },
   { href: '/security', key: 'security', icon: Shield },
@@ -42,11 +44,16 @@ export default function OverviewPage() {
   const tc = useTranslations('common');
   const tn = useTranslations('nav');
   const tm = useTranslations('membership');
+  const ta = useTranslations('applications');
   const label = useStatusLabel();
   const { user } = useAuth();
   const membership = useQuery({
     queryKey: ['me', 'membership'],
     queryFn: membershipService.get,
+  });
+  const applications = useQuery({
+    queryKey: ['me', 'applications'],
+    queryFn: applicationService.mine,
   });
 
   if (!user) return null;
@@ -171,9 +178,74 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
 
+        <Card className="md:col-span-12">
+          <CardHeader className="flex-row items-start justify-between gap-3 border-b border-border pb-5">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <AppWindow className="size-4 text-primary" aria-hidden />
+                {t('appRolesTitle')}
+              </CardTitle>
+              <CardDescription className="mt-1">{t('appRolesHint')}</CardDescription>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/applications">
+                {tn('applications')}
+                <ArrowUpRight className="size-4" aria-hidden />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="pt-5">
+            {applications.isLoading ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : applications.isError ? (
+              <p className="text-sm font-medium text-destructive" role="alert">
+                {tc('error')}
+              </p>
+            ) : !applications.data?.length ? (
+              <p className="text-sm text-muted-foreground">{ta('empty')}</p>
+            ) : (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {applications.data.map((app) => (
+                  <li
+                    key={app.code}
+                    className="rounded-xl border border-border bg-muted/30 px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{app.name}</p>
+                      <StatusBadge status={app.access} />
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {app.code}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {app.roles.length ? (
+                        app.roles.map((role) => (
+                          <span
+                            key={role}
+                            className="rounded-full bg-background px-2.5 py-0.5 text-[11px] font-medium tracking-wide ring-1 ring-border"
+                          >
+                            {label(role)}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {ta('noRoles')}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="gap-0 py-0 shadow-none md:col-span-12">
           <nav
-            className="grid divide-y divide-border md:grid-cols-3 md:divide-x md:divide-y-0"
+            className="grid divide-y divide-border md:grid-cols-4 md:divide-x md:divide-y-0"
             aria-label={t('quickLinks')}
           >
             {QUICK_LINKS.map(({ href, key, icon: Icon }) => (

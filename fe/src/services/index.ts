@@ -54,10 +54,15 @@ export const authService = {
     request.post('/auth/change-email/request', { newEmail }),
   confirmEmailChange: (newEmail: string, otp: string) =>
     request.post('/auth/change-email/confirm', { newEmail, otp }),
-  beginSocial: (provider: string) =>
-    request.get<{ authorizationUrl: string }>(
-      `/auth/social/${provider.toLowerCase()}`,
-    ),
+  beginSocial: (provider: string, returnTo?: string | null) => {
+    const q =
+      returnTo && returnTo.trim()
+        ? `?return_to=${encodeURIComponent(returnTo.trim())}`
+        : '';
+    return request.get<{ authorizationUrl: string }>(
+      `/auth/social/${provider.toLowerCase()}${q}`,
+    );
+  },
   verify2fa: (
     method: 'totp' | 'email' | 'backup-code',
     code: string,
@@ -211,6 +216,13 @@ export const securityService = {
     request.post(`/auth/2fa/admin/unrequire/${userId}`),
 };
 
+export type UserSearchHit = {
+  id: string;
+  fullName: string | null;
+  email: string;
+  avatar: string | null;
+};
+
 export const adminUserService = {
   list: (search = '', opts?: { pending?: boolean; page?: number }) => {
     const q = new URLSearchParams({
@@ -221,6 +233,12 @@ export const adminUserService = {
     const path = opts?.pending ? `/users/pending?${q}` : `/users?${q}`;
     return request.get<{ data: User[]; meta?: { total: number } }>(path);
   },
+  search: (q: string) =>
+    request
+      .get<{ users: UserSearchHit[] }>(
+        `/users/search?q=${encodeURIComponent(q.trim())}`,
+      )
+      .then((r) => r.users ?? []),
   count: () => request.get<{ count: number }>('/users/count'),
   get: (id: string) =>
     request.get<{ users: User }>(`/users/${id}`).then((r) => r.users),
@@ -255,6 +273,7 @@ export type RbacApplication = {
   clientSecrets?: RbacClientSecret[];
   status: 'ACTIVE' | 'DISABLED';
   require2fa: boolean;
+  accessMode: 'MANUAL' | 'MEMBERS';
   redirectUris: { id: string; redirectUri: string }[];
   roles: {
     id: string;
@@ -301,6 +320,7 @@ export const rbacService = {
     name: string;
     clientId: string;
     require2fa?: boolean;
+    accessMode?: 'MANUAL' | 'MEMBERS';
     redirectUri?: string;
   }) => request.post<RbacApplication>('/admin/applications', body),
   createClientSecret: (code: string, body: { label?: string } = {}) =>
@@ -324,6 +344,7 @@ export const rbacService = {
       clientId?: string;
       status?: 'ACTIVE' | 'DISABLED';
       require2fa?: boolean;
+      accessMode?: 'MANUAL' | 'MEMBERS';
     },
   ) => request.patch<RbacApplication>(`/admin/applications/${code}`, body),
   addRedirectUri: (code: string, redirectUri: string) =>

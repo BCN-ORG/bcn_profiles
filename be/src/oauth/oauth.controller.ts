@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpException,
   Post,
   Query,
   Req,
@@ -11,9 +12,15 @@ import {
 import type { Request, Response } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
 import { IdentitySessionService } from '../identity/session.service';
+import { AuthorizationService } from '../authorization/authorization.service';
 import { AuthorizeQueryDto, RevokeDto, TokenDto } from './oauth.dto';
 import { OauthService } from './oauth.service';
 import { OauthTokenService } from './oauth-token.service';
+import {
+  appendOauthAppParams,
+  buildAuthorizeReturnUrl,
+  safeAppOrigin,
+} from './oauth-return.util';
 
 @Controller()
 export class OauthController {
@@ -21,6 +28,7 @@ export class OauthController {
     private readonly oauth: OauthService,
     private readonly sessions: IdentitySessionService,
     private readonly tokens: OauthTokenService,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   private issuer(): string {
@@ -28,6 +36,12 @@ export class OauthController {
       process.env.OAUTH_ISSUER?.trim() ||
       process.env.APP_URL?.trim() ||
       'http://localhost:3000/api'
+    ).replace(/\/$/, '');
+  }
+
+  private frontendOrigin(): string {
+    return (
+      process.env.FRONTEND_URL?.trim() || 'http://localhost:3001'
     ).replace(/\/$/, '');
   }
 
@@ -62,23 +76,36 @@ export class OauthController {
     @Req() request: Request,
     @Res() response: Response,
   ) {
+    const authorizeReturn = buildAuthorizeReturnUrl(
+      this.issuer(),
+      request.originalUrl,
+    );
+    const appName = query.client_id
+      ? await this.authorization.findApplicationName(query.client_id)
+      : null;
+    const appReturn = safeAppOrigin(query.redirect_uri);
     const session = await this.sessions.getSso(
       request.cookies?.bcn_sso as string | undefined,
     );
     if (!session) {
-      const fe = (
-        process.env.FRONTEND_URL?.trim() || 'http://localhost:5173'
-      ).replace(/\/$/, '');
-      const returnUrl = `${request.protocol}://${request.get('host')}${request.originalUrl}`;
-      const loginUrl = new URL(`${fe}/login`);
-      loginUrl.searchParams.set('oauth_return', returnUrl);
+      const loginUrl = new URL(`${this.frontendOrigin()}/login`);
+      loginUrl.searchParams.set('oauth_return', authorizeReturn);
+      appendOauthAppParams(loginUrl, query.client_id, appName, appReturn);
       return response.redirect(302, loginUrl.toString());
     }
-    const result = await this.oauth.authorize(query, session);
-    const url = new URL(result.redirectUri);
-    url.searchParams.set('code', result.code);
-    url.searchParams.set('state', result.state);
-    return response.redirect(302, url.toString());
+    try {
+      const result = await this.oauth.authorize(query, session);
+      const url = new URL(result.redirectUri);
+      url.searchParams.set('code', result.code);
+      url.searchParams.set('state', result.state);
+      return response.redirect(302, url.toString());
+    } catch (error) {
+      const errorUrl = new URL(`${this.frontendOrigin()}/oauth/error`);
+      errorUrl.searchParams.set('code', authorizeErrorCode(error));
+      errorUrl.searchParams.set('oauth_return', authorizeReturn);
+      appendOauthAppParams(errorUrl, query.client_id, appName, appReturn);
+      return response.redirect(302, errorUrl.toString());
+    }
   }
 
   @Public()
@@ -96,3 +123,22 @@ export class OauthController {
     return response.status(200).send();
   }
 }
+
+export function authorizeErrorCode(error: unknown): string {
+  if (!(error instanceof HttpException)) return 'OAUTH_ERROR';
+  const body = error.getResponse();
+  if (body && typeof body === 'object') {
+    const code = (body as { code?: unknown }).code;
+    if (typeof code === 'string' && code.trim()) return code;
+  }
+  if (error.getStatus() === 404) return 'APPLICATION_NOT_FOUND';
+  return 'OAUTH_ERROR';
+}
+
+// Re-export for existing imports/tests
+export {
+  appendOauthAppParams,
+  buildAuthorizeReturnUrl,
+  safeAppOrigin,
+  sanitizeOauthReturnTo,
+} from './oauth-return.util';

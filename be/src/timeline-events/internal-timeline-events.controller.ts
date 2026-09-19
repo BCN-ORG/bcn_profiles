@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Query } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
 import { RecordTimelineEventDto } from './dto/record-timeline-event.dto';
 import { TimelineEventsService } from './timeline-events.service';
@@ -14,5 +14,15 @@ export class InternalTimelineEventsController {
     @Body() dto: RecordTimelineEventDto,
   ) {
     return this.timelineEventsService.recordFromApplication(header, dto);
+  }
+
+  /** Batch public profile fields for app backends (Basic client credentials). */
+  @Public()
+  @Get('users')
+  lookupUsers(
+    @Headers('authorization') header: string | undefined,
+    @Query('ids') ids?: string,
+  ) {
+    return this.timelineEventsService.lookupUsersFromApplication(header, ids);
   }
 }

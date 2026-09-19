@@ -11,7 +11,11 @@ import { AuthorizationService } from './authorization.service';
 
 export type ApplicationManifest = {
   app: { code: string; name: string; clientId: string };
-  auth?: { redirectUri?: string; require2FA?: boolean };
+  auth?: {
+    redirectUri?: string;
+    require2FA?: boolean;
+    accessMode?: 'MANUAL' | 'MEMBERS' | 'manual' | 'members';
+  };
   roles?: { code: string; name?: string; description?: string }[];
   permissions?: { code: string; description?: string }[];
   rolePermissions?: Record<string, string[]>;
@@ -75,11 +79,13 @@ export class ApplicationsAdminService {
     name: string;
     clientId: string;
     require2fa?: boolean;
+    accessMode?: 'MANUAL' | 'MEMBERS';
     redirectUri?: string;
   }) {
     const code = body.code.trim().toUpperCase();
     const id = `app-${code.toLowerCase()}`;
     this.validateApplicationInput(body);
+    const accessMode = this.normalizeAccessMode(body.accessMode) ?? 'MANUAL';
     const app = await this.prisma.application.create({
       data: {
         id,
@@ -87,6 +93,7 @@ export class ApplicationsAdminService {
         name: body.name.trim(),
         clientId: body.clientId.trim(),
         require2fa: body.require2fa ?? false,
+        accessMode,
         status: 'ACTIVE',
       },
     });
@@ -178,9 +185,11 @@ export class ApplicationsAdminService {
       clientId?: string;
       status?: ApplicationStatus;
       require2fa?: boolean;
+      accessMode?: 'MANUAL' | 'MEMBERS';
     },
   ) {
     const app = await this.findApplication(appCode);
+    const accessMode = this.normalizeAccessMode(body.accessMode);
     await this.prisma.application.update({
       where: { id: app.id },
       data: {
@@ -192,6 +201,7 @@ export class ApplicationsAdminService {
         ...(body.require2fa !== undefined
           ? { require2fa: body.require2fa }
           : {}),
+        ...(accessMode !== undefined ? { accessMode } : {}),
       },
     });
     await Promise.all([
@@ -575,6 +585,8 @@ export class ApplicationsAdminService {
         'Manifest clientId belongs to another application',
       );
     }
+    const accessMode =
+      this.normalizeAccessMode(manifest.auth?.accessMode) ?? 'MANUAL';
     const app = existing
       ? await this.prisma.application.update({
           where: { id: existing.id },
@@ -582,6 +594,9 @@ export class ApplicationsAdminService {
             name: manifest.app.name.trim(),
             clientId: manifest.app.clientId.trim(),
             require2fa: manifest.auth?.require2FA ?? false,
+            ...(manifest.auth?.accessMode !== undefined
+              ? { accessMode }
+              : {}),
           },
         })
       : await this.prisma.application.create({
@@ -591,6 +606,7 @@ export class ApplicationsAdminService {
             name: manifest.app.name.trim(),
             clientId: manifest.app.clientId.trim(),
             require2fa: manifest.auth?.require2FA ?? false,
+            accessMode,
           },
         });
 
@@ -844,6 +860,23 @@ export class ApplicationsAdminService {
     }
     if (manifest.auth?.redirectUri)
       this.validateRedirectUri(manifest.auth.redirectUri);
+    if (
+      manifest.auth?.accessMode !== undefined &&
+      this.normalizeAccessMode(manifest.auth.accessMode) === undefined
+    ) {
+      throw new BadRequestException(
+        'Manifest auth.accessMode must be MANUAL or MEMBERS',
+      );
+    }
+  }
+
+  private normalizeAccessMode(
+    value: string | undefined | null,
+  ): 'MANUAL' | 'MEMBERS' | undefined {
+    if (value === undefined || value === null || value === '') return undefined;
+    const normalized = String(value).trim().toUpperCase();
+    if (normalized === 'MANUAL' || normalized === 'MEMBERS') return normalized;
+    return undefined;
   }
 
   private async issueClientSecret() {

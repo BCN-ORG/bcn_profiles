@@ -7,6 +7,7 @@ import {
   Suspense,
   useContext,
   useEffect,
+  useState,
   type ReactNode,
 } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -14,6 +15,11 @@ import { authService } from '@/services';
 import type { User } from '@/types';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { needsOnboarding, isOnboardingExemptPath } from '@/lib/onboarding';
+import {
+  clearOauthHandoff,
+  readOauthHandoff,
+  takeOauthReturn,
+} from '@/lib/oauth-handoff';
 import { Button, Skeleton } from '@/components/ui/primitives';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +41,52 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+/** After social login: block Profiles chrome until authorize resume finishes. */
+function OauthHandoffResume({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const pathname = usePathname();
+  const [hadHandoff] = useState(
+    () => typeof window !== 'undefined' && Boolean(readOauthHandoff()),
+  );
+  const [blocking, setBlocking] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      Boolean(readOauthHandoff()) &&
+      !window.location.pathname.includes('/login'),
+  );
+
+  useEffect(() => {
+    if (!hadHandoff) return;
+    if (pathname.startsWith('/login')) {
+      setBlocking(false);
+      return;
+    }
+    if (isLoading) {
+      setBlocking(true);
+      return;
+    }
+    if (user) {
+      setBlocking(true);
+      const resume = takeOauthReturn();
+      if (resume) {
+        window.location.replace(resume);
+        return;
+      }
+    }
+    setBlocking(false);
+  }, [hadHandoff, isLoading, user, pathname]);
+
+  if (blocking) {
+    return (
+      <main className="flex min-h-screen items-center justify-center">
+        <Skeleton className="size-8 rounded-full" />
+      </main>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const query = useQuery({
@@ -51,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Clear local session even when the API call fails (network, expired cookie).
     }
+    clearOauthHandoff();
     queryClient.setQueryData(['me'], null);
     queryClient.removeQueries({
       predicate: (q) => q.queryKey[0] === 'me',
@@ -67,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
       }}
     >
-      {children}
+      <OauthHandoffResume>{children}</OauthHandoffResume>
     </AuthContext.Provider>
   );
 }

@@ -57,6 +57,35 @@ export class UserinfoController {
         message: 'Account is not active',
       });
     }
+
+    // App roles + permissions for this token audience (aud=quiz → QUIZ).
+    const appCode = payload.aud.trim().toUpperCase();
+    const roleRows = await this.prisma.userAppRole.findMany({
+      where: {
+        userId: user.id,
+        application: { code: appCode },
+      },
+      select: {
+        role: {
+          select: {
+            code: true,
+            permissions: {
+              select: { permission: { select: { code: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    const roles = [...new Set(roleRows.map((row) => row.role.code))];
+    const permissions = [
+      ...new Set(
+        roleRows.flatMap((row) =>
+          row.role.permissions.map(({ permission }) => permission.code),
+        ),
+      ),
+    ];
+
     return {
       id: user.id,
       email: user.email,
@@ -64,6 +93,8 @@ export class UserinfoController {
       avatarUrl: user.avatar,
       phone: user.phone,
       role: user.role,
+      roles,
+      permissions,
       aud: payload.aud,
       sid: payload.sid,
     };

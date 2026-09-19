@@ -27,6 +27,12 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SocialIcon } from '@/components/auth/social-icons';
+import { oauthAppName } from '@/lib/oauth-app-name';
+import {
+  clearOauthHandoff,
+  resolveOauthReturn,
+  writeOauthHandoff,
+} from '@/lib/oauth-handoff';
 
 type AuthStep =
   | { kind: 'login' }
@@ -40,11 +46,28 @@ function initialAuthStep(): AuthStep {
 export default function LoginPage() {
   const t = useTranslations('login');
   const tc = useTranslations('common');
+  const to = useTranslations('oauthError');
   const { refresh, setUser, user, isLoading } = useAuth();
   const router = useRouter();
   const search = useSearchParams();
   const next = search.get('next') || '/';
-  const oauthReturn = search.get('oauth_return');
+  const oauthReturnQuery = search.get('oauth_return');
+  const oauthReturn = resolveOauthReturn(oauthReturnQuery);
+  const continuingToApp = Boolean(oauthReturn);
+  const appName = oauthAppName(search, to('unknownApp'));
+  const appReturn = (() => {
+    const raw =
+      search.get('app_return')?.trim() ||
+      undefined;
+    if (!raw) return null;
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      return url.origin;
+    } catch {
+      return null;
+    }
+  })();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -52,6 +75,7 @@ export default function LoginPage() {
   const [code, setCode] = useState('');
   const [step, setStepState] = useState<AuthStep>({ kind: 'login' });
   const [busy, setBusy] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
 
@@ -61,21 +85,44 @@ export default function LoginPage() {
     else writeAuthStep(nextStep);
   }
 
+  function leaveToOauth(url: string) {
+    setLeaving(true);
+    clearOauthHandoff();
+    window.location.replace(url);
+  }
+
   useEffect(() => {
     const stored = initialAuthStep();
     if (stored.kind !== 'login') setStepState(stored);
   }, []);
 
   useEffect(() => {
+    if (oauthReturnQuery) {
+      writeOauthHandoff({
+        oauthReturn: oauthReturnQuery,
+        clientId: search.get('client_id'),
+        appName: search.get('app_name'),
+        appReturn: search.get('app_return'),
+      });
+      return;
+    }
+    // Fresh Profiles login (not mid social/2FA) — drop stale app handoff.
+    if (!search.get('oauth') && !search.get('token')) {
+      clearOauthHandoff();
+    }
+  }, [oauthReturnQuery, search]);
+
+  useEffect(() => {
     if (!isLoading && user) {
       clearAuthStep();
-      if (oauthReturn) {
-        window.location.assign(oauthReturn);
+      const resume = resolveOauthReturn(oauthReturnQuery);
+      if (resume) {
+        leaveToOauth(resume);
         return;
       }
       router.replace(needsOnboarding(user) ? '/welcome' : next);
     }
-  }, [isLoading, user, router, next, oauthReturn]);
+  }, [isLoading, user, router, next, oauthReturnQuery]);
 
   useEffect(() => {
     const oauth = search.get('oauth');
@@ -123,8 +170,9 @@ export default function LoginPage() {
       return;
     }
     setUser(me);
-    if (oauthReturn) {
-      window.location.assign(oauthReturn);
+    const resume = resolveOauthReturn(oauthReturnQuery);
+    if (resume) {
+      leaveToOauth(resume);
       return;
     }
     router.replace(needsOnboarding(me) ? '/welcome' : next);
@@ -135,7 +183,11 @@ export default function LoginPage() {
     label: string,
   ) {
     try {
-      const { authorizationUrl } = await authService.beginSocial(provider);
+      const resume = resolveOauthReturn(oauthReturnQuery);
+      const { authorizationUrl } = await authService.beginSocial(
+        provider,
+        resume,
+      );
       location.assign(authorizationUrl);
     } catch (reason) {
       const code =
@@ -208,17 +260,40 @@ export default function LoginPage() {
 
   const title =
     step.kind === 'login'
-      ? t('title')
+      ? continuingToApp
+        ? t('oauthTitle', { app: appName })
+        : t('title')
       : step.kind === 'verify'
         ? t('verifyTitle')
         : t('setupTitle');
 
+  const description =
+    step.kind === 'login'
+      ? continuingToApp
+        ? t('oauthSubtitle', { app: appName })
+        : t('subtitle')
+      : undefined;
+
+  if (leaving) {
+    return (
+      <AuthShell title={t('oauthLeaving', { app: appName })}>
+        <p className="text-center text-sm text-muted-foreground">
+          {t('oauthLeaving', { app: appName })}
+        </p>
+      </AuthShell>
+    );
+  }
+
   return (
-    <AuthShell
-      title={title}
-      description={step.kind === 'login' ? t('subtitle') : undefined}
-    >
+    <AuthShell title={title} description={description}>
       <form className="flex flex-col gap-5" onSubmit={submit}>
+        {continuingToApp && step.kind === 'login' ? (
+          <Alert>
+            <AlertDescription>
+              {t('oauthBanner', { app: appName })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {error ? (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -370,11 +445,19 @@ export default function LoginPage() {
           {busy
             ? tc('loading')
             : step.kind === 'login'
-              ? t('submit')
+              ? continuingToApp
+                ? t('oauthSubmit')
+                : t('submit')
               : step.kind === 'setup' && !step.secret
                 ? tc('continue')
                 : tc('confirm')}
         </Button>
+
+        {continuingToApp && appReturn && step.kind === 'login' ? (
+          <Button asChild variant="ghost" className="h-11 w-full">
+            <a href={appReturn}>{t('backToApp', { app: appName })}</a>
+          </Button>
+        ) : null}
 
         {step.kind === 'login' ? (
           <>

@@ -4,7 +4,6 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
-import { WinstonModule } from 'nest-winston';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -17,7 +16,6 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { TimelineEventsModule } from './timeline-events/timeline-events.module';
 import { HttpExceptionEnvelopeFilter } from './common/filters/http-exception-envelope.filter';
 import { RequestLoggingInterceptor } from './common/logging/request-logging.interceptor';
-import { createWinstonLoggerOptions } from './common/logging/winston.config';
 import { IdentityModule } from './identity/identity.module';
 import { OauthModule } from './oauth/oauth.module';
 import { ExternalIdentitiesModule } from './external-identities/external-identities.module';
@@ -31,9 +29,6 @@ import { ApplicationManagerGuard } from './authorization/application-manager.gua
       envFilePath:
         process.env.NODE_ENV === 'production' ? '.env.production' : '.env',
     }),
-    WinstonModule.forRoot(
-      createWinstonLoggerOptions(process.env.SERVICE_NAME ?? 'profile_api'),
-    ),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

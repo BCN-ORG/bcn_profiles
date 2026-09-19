@@ -34,6 +34,7 @@ import {
   rbacService,
   type RbacApplication,
 } from '@/services';
+import { UserSearchPicker } from '@/components/admin/user-search-picker';
 import { PageShell } from '@/components/layout/page-shell';
 import {
   Card,
@@ -61,6 +62,24 @@ function roleHasPermission(
   return role?.permissions.some((p) => p.permission.code === permCode) ?? false;
 }
 
+function roleLabel(role: { code: string; name?: string | null }) {
+  return role.name?.trim() || role.code;
+}
+
+function permissionLabel(perm: {
+  code: string;
+  description?: string | null;
+}) {
+  const description = perm.description?.trim();
+  if (description) return description;
+  const parts = perm.code.split('.').filter(Boolean);
+  const rest = parts.length > 1 ? parts.slice(1) : parts;
+  return rest
+    .map((part) => part.replace(/[_-]+/g, ' '))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' · ');
+}
+
 export default function AdminRbacPage() {
   const t = useTranslations('rbac');
   const tc = useTranslations('common');
@@ -79,6 +98,7 @@ export default function AdminRbacPage() {
     clientId: '',
     redirectUri: '',
     require2fa: false,
+    accessMode: 'MANUAL' as 'MANUAL' | 'MEMBERS',
   });
   const [newUri, setNewUri] = useState('');
   const [newRole, setNewRole] = useState({ code: '', name: '' });
@@ -123,10 +143,14 @@ export default function AdminRbacPage() {
   });
 
   const app = appQuery.data;
-  const activeRoleCode =
-    selectedRole && app?.roles.some((r) => r.code === selectedRole)
-      ? selectedRole
-      : (app?.roles[0]?.code ?? null);
+  const activeRole =
+    app?.roles.find((role) => role.code === selectedRole) ??
+    app?.roles[0] ??
+    null;
+  const activeRoleCode = activeRole?.code ?? null;
+  const permissionCodeExample =
+    app?.permissions[0]?.code ??
+    `${(activeCode ?? 'APP').toLowerCase()}.question.read`;
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'rbac'] });
@@ -164,6 +188,7 @@ export default function AdminRbacPage() {
         name: createForm.name,
         clientId: createForm.clientId,
         require2fa: createForm.require2fa,
+        accessMode: createForm.accessMode,
         redirectUri: createForm.redirectUri || undefined,
       });
       setSelectedCode(created.code);
@@ -173,6 +198,7 @@ export default function AdminRbacPage() {
         clientId: '',
         redirectUri: '',
         require2fa: false,
+        accessMode: 'MANUAL',
       });
       setShowCreate(false);
       if (created.clientSecret) {
@@ -264,6 +290,20 @@ export default function AdminRbacPage() {
                   }
                 />
                 {t('require2fa')}
+              </label>
+              <label className="flex items-center gap-2 text-sm md:col-span-2">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border"
+                  checked={createForm.accessMode === 'MEMBERS'}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({
+                      ...f,
+                      accessMode: e.target.checked ? 'MEMBERS' : 'MANUAL',
+                    }))
+                  }
+                />
+                {t('accessModeMembers')}
               </label>
               <div className="flex gap-2 md:col-span-2">
                 <Button type="submit" disabled={busy}>
@@ -391,6 +431,11 @@ export default function AdminRbacPage() {
                         2FA
                       </span>
                     ) : null}
+                    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      {app.accessMode === 'MEMBERS'
+                        ? t('accessModeMembersBadge')
+                        : t('accessModeManualBadge')}
+                    </span>
                   </div>
                   <dl className="grid gap-3 text-sm sm:grid-cols-2">
                     <div className="rounded-lg bg-muted/45 px-3 py-2">
@@ -534,6 +579,26 @@ export default function AdminRbacPage() {
                       }
                     >
                       {app.require2fa ? t('unrequire2fa') : t('require2fa')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        run(() =>
+                          rbacService.updateApp(app.code, {
+                            accessMode:
+                              app.accessMode === 'MEMBERS'
+                                ? 'MANUAL'
+                                : 'MEMBERS',
+                          }),
+                        )
+                      }
+                    >
+                      {app.accessMode === 'MEMBERS'
+                        ? t('accessModeSetManual')
+                        : t('accessModeSetMembers')}
                     </Button>
                   </div>
                 ) : null}
@@ -743,7 +808,7 @@ export default function AdminRbacPage() {
                               {platformAdmin ? (
                                 <ConfirmDialog
                                   title={t('deleteRoleTitle', {
-                                    role: role.code,
+                                    role: roleLabel(role),
                                   })}
                                   description={t('deleteRoleConfirm')}
                                   confirmLabel={t('deleteRoleAction')}
@@ -791,8 +856,8 @@ export default function AdminRbacPage() {
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm">
-                        {activeRoleCode
-                          ? t('permsForRole', { role: activeRoleCode })
+                        {activeRole
+                          ? t('permsForRole', { role: roleLabel(activeRole) })
                           : t('tabPerms')}
                       </CardTitle>
                       <CardDescription>{t('accessHint')}</CardDescription>
@@ -813,12 +878,29 @@ export default function AdminRbacPage() {
                           }}
                         >
                           <div className="space-y-1.5">
+                            <Label htmlFor="new-permission-description">
+                              {t('permDesc')}
+                            </Label>
+                            <Input
+                              id="new-permission-description"
+                              placeholder={t('permDescPlaceholder')}
+                              value={newPerm.description}
+                              onChange={(e) =>
+                                setNewPerm((p) => ({
+                                  ...p,
+                                  description: e.target.value,
+                                }))
+                              }
+                              className="h-9"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
                             <Label htmlFor="new-permission-code">
                               {t('permCode')}
                             </Label>
                             <Input
                               id="new-permission-code"
-                              placeholder={`${app.code.toLowerCase()}.resource.action`}
+                              placeholder={permissionCodeExample}
                               value={newPerm.code}
                               onChange={(e) =>
                                 setNewPerm((p) => ({
@@ -828,22 +910,6 @@ export default function AdminRbacPage() {
                               }
                               required
                               className="h-9 font-mono text-xs"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="new-permission-description">
-                              {t('permDesc')}
-                            </Label>
-                            <Input
-                              id="new-permission-description"
-                              value={newPerm.description}
-                              onChange={(e) =>
-                                setNewPerm((p) => ({
-                                  ...p,
-                                  description: e.target.value,
-                                }))
-                              }
-                              className="h-9"
                             />
                           </div>
                           <Button type="submit" size="sm" disabled={busy}>
@@ -902,7 +968,10 @@ export default function AdminRbacPage() {
                                     }
                                   />
                                   <span className="min-w-0">
-                                    <span className="block font-mono text-xs font-medium [overflow-wrap:anywhere]">
+                                    <span className="block text-sm font-medium [overflow-wrap:anywhere]">
+                                      {permissionLabel(perm)}
+                                    </span>
+                                    <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground [overflow-wrap:anywhere]">
                                       {perm.code}
                                     </span>
                                     {perm.deprecated ? (
@@ -910,17 +979,12 @@ export default function AdminRbacPage() {
                                         {t('deprecated')}
                                       </Badge>
                                     ) : null}
-                                    {perm.description ? (
-                                      <span className="block text-xs text-muted-foreground">
-                                        {perm.description}
-                                      </span>
-                                    ) : null}
                                   </span>
                                 </label>
                                 {platformAdmin ? (
                                   <ConfirmDialog
                                     title={t('deletePermissionTitle', {
-                                      permission: perm.code,
+                                      permission: permissionLabel(perm),
                                     })}
                                     description={t('deletePermissionConfirm')}
                                     confirmLabel={t('deletePermissionAction')}
@@ -1161,6 +1225,7 @@ export default function AdminRbacPage() {
                       className="rounded-xl border border-border bg-muted/20 p-4"
                       onSubmit={(event) => {
                         event.preventDefault();
+                        if (!memberUserId.trim()) return;
                         run(async () => {
                           await applicationService.grant(
                             memberUserId,
@@ -1171,21 +1236,20 @@ export default function AdminRbacPage() {
                       }}
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <div className="min-w-0 flex-1 space-y-2">
-                          <Label htmlFor="member-user-id">
-                            {t('memberUserId')}
-                          </Label>
-                          <Input
-                            id="member-user-id"
-                            value={memberUserId}
-                            onChange={(event) =>
-                              setMemberUserId(event.target.value)
-                            }
-                            placeholder="cm..."
-                            required
-                          />
-                        </div>
-                        <Button type="submit" disabled={busy}>
+                        <UserSearchPicker
+                          id="member-user-search"
+                          label={t('memberUserSearch')}
+                          value={memberUserId}
+                          onChange={(userId) => setMemberUserId(userId)}
+                          placeholder={t('memberUserSearchPlaceholder')}
+                          emptyHint={t('memberUserEmpty')}
+                          required
+                          disabled={busy}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={busy || !memberUserId.trim()}
+                        >
                           {t('grantAccess')}
                         </Button>
                       </div>
@@ -1270,7 +1334,7 @@ export default function AdminRbacPage() {
                                         }
                                       >
                                         {assigned ? <Check className="size-3" aria-hidden /> : null}
-                                        {role.code}
+                                        {roleLabel(role)}
                                       </button>
                                     );
                                   })}
@@ -1360,6 +1424,7 @@ export default function AdminRbacPage() {
                         className="flex flex-col gap-2 sm:flex-row sm:items-end"
                         onSubmit={(event) => {
                           event.preventDefault();
+                          if (!managerUserId.trim()) return;
                           run(async () => {
                             await rbacService.addManager(
                               app.code,
@@ -1369,20 +1434,20 @@ export default function AdminRbacPage() {
                           });
                         }}
                       >
-                        <div className="flex-1 space-y-2">
-                          <Label htmlFor="manager-user-id">
-                            {t('managerUserId')}
-                          </Label>
-                          <Input
-                            id="manager-user-id"
-                            value={managerUserId}
-                            onChange={(event) =>
-                              setManagerUserId(event.target.value)
-                            }
-                            required
-                          />
-                        </div>
-                        <Button type="submit" disabled={busy}>
+                        <UserSearchPicker
+                          id="manager-user-search"
+                          label={t('managerUserSearch')}
+                          value={managerUserId}
+                          onChange={(userId) => setManagerUserId(userId)}
+                          placeholder={t('memberUserSearchPlaceholder')}
+                          emptyHint={t('memberUserEmpty')}
+                          required
+                          disabled={busy}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={busy || !managerUserId.trim()}
+                        >
                           {t('addManager')}
                         </Button>
                       </form>

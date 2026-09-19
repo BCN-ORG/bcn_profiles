@@ -932,7 +932,14 @@ export class UsersService implements OnModuleInit {
 
   async searchUsers(
     query: string,
-  ): Promise<{ id: string; fullName: string | null; avatar: string | null }[]> {
+  ): Promise<
+    {
+      id: string;
+      fullName: string | null;
+      email: string;
+      avatar: string | null;
+    }[]
+  > {
     const normalizedQuery = query?.trim();
     if (!normalizedQuery) return [];
 
@@ -941,6 +948,7 @@ export class UsersService implements OnModuleInit {
       return cached as {
         id: string;
         fullName: string | null;
+        email: string;
         avatar: string | null;
       }[];
     }
@@ -948,10 +956,13 @@ export class UsersService implements OnModuleInit {
     const results = await this.prisma.user.findMany({
       where: {
         status: UserStatus.ACTIVE,
-        fullName: { contains: normalizedQuery, mode: 'insensitive' },
+        OR: [
+          { fullName: { contains: normalizedQuery, mode: 'insensitive' } },
+          { email: { contains: normalizedQuery, mode: 'insensitive' } },
+        ],
       },
-      select: { id: true, fullName: true, avatar: true },
-      orderBy: { createdAt: 'desc' },
+      select: { id: true, fullName: true, email: true, avatar: true },
+      orderBy: { fullName: 'asc' },
       take: 20,
     });
 

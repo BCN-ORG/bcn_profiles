@@ -48,19 +48,97 @@ export class AuthorizationService {
     return application;
   }
 
-  async assertAccess(userId: string, appId: string): Promise<void> {
-    const access = await this.prisma.userAppAccess.findUnique({
-      where: { userId_applicationId: { userId, applicationId: appId } },
+  /** Display name for OAuth handoff UI — does not enforce ACTIVE. */
+  async findApplicationName(clientIdOrCode: string): Promise<string | null> {
+    const id = clientIdOrCode?.trim();
+    if (!id) return null;
+    const application = await this.prisma.application.findFirst({
+      where: {
+        OR: [{ clientId: id }, { code: id.toUpperCase() }],
+      },
+      select: { name: true },
     });
-    if (
-      access?.status !== 'ACTIVE' ||
-      (access.expiresAt && access.expiresAt.getTime() <= Date.now())
-    ) {
+    return application?.name?.trim() || null;
+  }
+
+  async assertAccess(userId: string, appId: string): Promise<void> {
+    const app = await this.prisma.application.findUnique({
+      where: { id: appId },
+      select: { id: true, code: true, accessMode: true },
+    });
+    if (!app) {
       throw new ForbiddenException({
         code: 'APP_ACCESS_DENIED',
         message: 'Application access is denied',
       });
     }
+
+    const access = await this.prisma.userAppAccess.findUnique({
+      where: { userId_applicationId: { userId, applicationId: appId } },
+    });
+    const expired =
+      Boolean(access?.expiresAt) &&
+      access!.expiresAt!.getTime() <= Date.now();
+
+    if (app.accessMode === 'MEMBERS') {
+      if (access?.status === 'BLOCKED' || (access?.status === 'ACTIVE' && expired)) {
+        throw new ForbiddenException({
+          code: 'APP_ACCESS_DENIED',
+          message: 'Application access is denied',
+        });
+      }
+      if (!access) {
+        await this.prisma.userAppAccess.create({
+          data: {
+            id: randomUUID(),
+            userId,
+            applicationId: app.id,
+            status: 'ACTIVE',
+            grantedAt: new Date(),
+          },
+        });
+      }
+      await this.ensureDefaultMemberRole(userId, app.id, app.code);
+      return;
+    }
+
+    if (access?.status !== 'ACTIVE' || expired) {
+      throw new ForbiddenException({
+        code: 'APP_ACCESS_DENIED',
+        message: 'Application access is denied',
+      });
+    }
+  }
+
+  /** MEMBERS mode: first visit gets catalog MEMBER role when present and user has none. */
+  private async ensureDefaultMemberRole(
+    userId: string,
+    applicationId: string,
+    appCode: string,
+  ): Promise<void> {
+    const existing = await this.prisma.userAppRole.findFirst({
+      where: { userId, applicationId },
+      select: { roleId: true },
+    });
+    if (existing) return;
+
+    const memberRole = await this.prisma.appRole.findUnique({
+      where: {
+        applicationId_code: { applicationId, code: 'MEMBER' },
+      },
+      select: { id: true },
+    });
+    if (!memberRole) return;
+
+    await this.prisma.userAppRole.create({
+      data: {
+        userId,
+        applicationId,
+        roleId: memberRole.id,
+        assignedBy: null,
+      },
+    });
+    await this.invalidate(userId, appCode);
   }
 
   async resolve(

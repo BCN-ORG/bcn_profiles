@@ -14,7 +14,7 @@ Nginx (managed on server): `/api/` → `127.0.0.1:18085`, `/` → `127.0.0.1:180
 
 Variables: `APP_PORT`, `HOST_PORT`, `DB_HOST=postgres`, `DB_PORT=5432`, `DB_DATABASE`, `DB_USERNAME`, `DB_SCHEMA=public`, `REDIS_HOST=redis`, `REDIS_PORT=6379`, `REDIS_PREFIX`, `MINIO_ENDPOINT=https://storage.bcn.id.vn`, `MINIO_BUCKET`, `MINIO_FORCE_PATH_STYLE=true`. Public endpoint phải là origin HTTPS không có subpath; reverse proxy giữ nguyên Host và path để chữ ký hợp lệ. Nếu dùng region khác mặc định, cấu hình `MINIO_REGION`.
 
-Secrets: `DB_PASSWORD`, `REDIS_PASSWORD` dùng chung do admin cấp, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` chỉ có quyền bucket của app. Profiles còn cần `JWT_SECRET`, `JWT_REFRESH_SECRET` khác nhau, `RESEND_API_KEY`; Variables `APP_URL` và `EMAIL_FROM` dùng domain đã xác thực. Quiz cần `PROFILES_API_BASE_URL=http://bcn_profiles:3000` (đổi port nếu APP_PORT của Profiles khác).
+Secrets: `DB_PASSWORD`, `REDIS_PASSWORD` dùng chung do admin cấp, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` chỉ có quyền bucket của app. Profiles còn cần `JWT_SECRET`, `JWT_REFRESH_SECRET` khác nhau, `RESEND_API_KEY`; Variables `APP_URL` và `EMAIL_FROM` dùng domain đã xác thực. Quiz cần `PROFILES_API_BASE_URL=http://bcn_profiles:3000/api` (đổi port nếu APP_PORT của Profiles khác).
 
 Không dùng PostgreSQL/MinIO admin credential. Không cần cấu hình `POSTGRES_*`, Cloudinary hoặc secret `DATABASE_URL`/`REDIS_URL`. CI tự URL-encode mật khẩu DB và tạo `DATABASE_URL`; Redis kết nối trực tiếp host/port/password với DB 0. `APP_PORT` được ưu tiên, `PORT` vẫn hỗ trợ local cũ.
 

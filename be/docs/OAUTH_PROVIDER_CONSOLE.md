@@ -1,5 +1,7 @@
 # OAuth provider console checklist (production)
 
+> Tài liệu này chỉ cấu hình các provider bên ngoài (Google, GitHub, Discord, Zalo) để BCN Profiles liên kết danh tính. Nếu một BCN application cần đăng nhập và đọc profile từ BCN Profiles, xem [BCN_CLIENT_APP_INTEGRATION.md](./BCN_CLIENT_APP_INTEGRATION.md).
+
 App callbacks must match GitHub Environment `production` redirect URIs.
 
 | Provider | Authorized redirect / callback URI |

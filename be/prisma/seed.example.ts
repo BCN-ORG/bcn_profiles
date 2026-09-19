@@ -139,18 +139,22 @@ async function main() {
       code: 'PROFILE',
       name: 'BCN Profiles',
       clientId: 'bcn-profile',
+      accessMode: 'MANUAL' as const,
       redirectUri:
         process.env.PROFILE_REDIRECT_URI ??
         'https://profiles.bcn.id.vn/auth/callback',
       permissions: ['profile.read', 'profile.update'],
+      memberPermissions: ['profile.read', 'profile.update'],
     },
     {
       id: 'app-quiz',
       code: 'QUIZ',
       name: 'BCN Quiz',
       clientId: 'bcn-quiz',
+      accessMode: 'MEMBERS' as const,
       redirectUri:
-        process.env.QUIZ_REDIRECT_URI ?? 'https://quiz.bcn.id.vn/auth/callback',
+        process.env.QUIZ_REDIRECT_URI ??
+        'https://quizzes.bcn.id.vn/api/auth/callback',
       permissions: [
         'quiz.question.read',
         'quiz.question.create',
@@ -158,12 +162,14 @@ async function main() {
         'quiz.question.delete',
         'quiz.result.read',
       ],
+      memberPermissions: ['quiz.question.read', 'quiz.result.read'],
     },
     {
       id: 'app-event',
       code: 'EVENT',
       name: 'BCN Event',
       clientId: 'bcn-event',
+      accessMode: 'MEMBERS' as const,
       redirectUri:
         process.env.EVENT_REDIRECT_URI ??
         'https://event.bcn.id.vn/auth/callback',
@@ -175,12 +181,14 @@ async function main() {
         'event.participant.read',
         'event.participant.export',
       ],
+      memberPermissions: ['event.read'],
     },
     {
       id: 'app-judge',
       code: 'JUDGE',
       name: 'BCN Judge',
       clientId: 'bcn-judge',
+      accessMode: 'MEMBERS' as const,
       redirectUri:
         process.env.JUDGE_REDIRECT_URI ??
         'https://judge.bcn.id.vn/auth/callback',
@@ -190,12 +198,14 @@ async function main() {
         'judge.submission.read',
         'judge.submission.review',
       ],
+      memberPermissions: ['judge.problem.read', 'judge.submission.read'],
     },
     {
       id: 'app-attendance',
       code: 'ATTENDANCE',
       name: 'BCN Attendance',
       clientId: 'bcn-attendance',
+      accessMode: 'MEMBERS' as const,
       redirectUri:
         process.env.ATTENDANCE_REDIRECT_URI ??
         'https://attendance.bcn.id.vn/auth/callback',
@@ -203,6 +213,10 @@ async function main() {
         'attendance.session.read',
         'attendance.checkin.execute',
         'attendance.report.read',
+      ],
+      memberPermissions: [
+        'attendance.session.read',
+        'attendance.checkin.execute',
       ],
     },
   ];
@@ -215,8 +229,13 @@ async function main() {
         code: app.code,
         name: app.name,
         clientId: app.clientId,
+        accessMode: app.accessMode,
       },
-      update: { name: app.name, clientId: app.clientId },
+      update: {
+        name: app.name,
+        clientId: app.clientId,
+        accessMode: app.accessMode,
+      },
     });
     await prisma.applicationRedirectUri.upsert({
       where: {
@@ -244,7 +263,7 @@ async function main() {
       },
       update: {},
     });
-    await prisma.appRole.upsert({
+    const member = await prisma.appRole.upsert({
       where: {
         applicationId_code: { applicationId: app.id, code: 'MEMBER' },
       },
@@ -272,6 +291,18 @@ async function main() {
         create: { roleId: admin.id, permissionId: permission.id },
         update: {},
       });
+      if (app.memberPermissions.includes(code)) {
+        await prisma.rolePermission.upsert({
+          where: {
+            roleId_permissionId: {
+              roleId: member.id,
+              permissionId: permission.id,
+            },
+          },
+          create: { roleId: member.id, permissionId: permission.id },
+          update: {},
+        });
+      }
     }
   }
 

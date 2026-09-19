@@ -52,6 +52,12 @@
   "login": {
     "title": "Welcome back",
     "subtitle": "Sign in with your BCN account.",
+    "oauthTitle": "Continue to {app}",
+    "oauthSubtitle": "Sign in with your BCN account to open {app}. You’ll return to the app afterward.",
+    "oauthBanner": "You’re opening {app} — sign in here, then you’ll go back to the app.",
+    "oauthSubmit": "Sign in and continue",
+    "oauthLeaving": "Opening {app}…",
+    "backToApp": "Back to {app}",
     "email": "Email",
     "password": "Password",
     "showPassword": "Show password",
@@ -188,7 +194,9 @@
     "identity": "Identity",
     "phoneLabel": "Phone",
     "statusLabel": "Status",
-    "quickLinks": "Quick access"
+    "quickLinks": "Quick access",
+    "appRolesTitle": "Roles by application",
+    "appRolesHint": "Your current roles on each app (MEMBER, MENTOR, ADMIN…)."
   },
   "account": {
     "title": "Profile",
@@ -245,6 +253,49 @@
     "statTotal": "Total",
     "statActive": "Active",
     "statBlocked": "Blocked"
+  },
+  "oauthError": {
+    "hint": "Ask a BCN admin if you need access to this application.",
+    "viewApps": "View my applications",
+    "fixMembership": "Verify membership",
+    "retry": "Try signing in again",
+    "backToApp": "Back to {app}",
+    "connections": "Connections",
+    "security": "Security",
+    "home": "Back home",
+    "unknownApp": "this app",
+    "APP_ACCESS_DENIED": {
+      "title": "Access not granted",
+      "body": "Your account does not have access to {app}. An admin must grant ACTIVE access before you can sign in."
+    },
+    "APP_DISABLED": {
+      "title": "Application disabled",
+      "body": "{app} is not accepting sign-in right now."
+    },
+    "STEP_UP_AUTH_REQUIRED": {
+      "title": "2FA required",
+      "body": "{app} requires two-factor authentication. Turn on 2FA, then try again."
+    },
+    "ACCOUNT_BLOCKED": {
+      "title": "Account is not active",
+      "body": "Your BCN account is not ACTIVE, so {app} cannot be opened."
+    },
+    "MEMBERSHIP_REQUIRED": {
+      "title": "BCN membership not verified",
+      "body": "App access alone is not enough. Link Discord (or Zalo) and verify membership before opening {app}."
+    },
+    "OAUTH_REDIRECT_URI_INVALID": {
+      "title": "Invalid redirect URI",
+      "body": "The callback URL for {app} is not registered on Profiles."
+    },
+    "APPLICATION_NOT_FOUND": {
+      "title": "Application not found",
+      "body": "No application matches {app}."
+    },
+    "OAUTH_ERROR": {
+      "title": "Could not sign in to the app",
+      "body": "BCN SSO did not complete for {app}. Try again or contact an admin."
+    }
   },
   "timeline": {
     "title": "Timeline",
@@ -313,6 +364,7 @@
   },
   "admin": {
     "usersTitle": "User administration",
+    "searchUsersPlaceholder": "Search by name or email…",
     "userDetail": "User detail",
     "approve": "Approve",
     "reject": "Reject",
@@ -387,6 +439,11 @@
     "redirectUri": "Redirect URI",
     "require2fa": "Require 2FA",
     "unrequire2fa": "Allow without 2FA",
+    "accessModeMembers": "Open to all eligible BCN members (block individuals only)",
+    "accessModeMembersBadge": "All members",
+    "accessModeManualBadge": "Invite only",
+    "accessModeSetMembers": "Open to all members",
+    "accessModeSetManual": "Invite only",
     "enable": "Enable",
     "disable": "Disable",
     "disableTitle": "Disable {app}?",
@@ -414,13 +471,14 @@
     "roleName": "Display name",
     "addRole": "Add role",
     "noRolesYet": "Create a role to start assigning permissions.",
-    "permCode": "Permission",
-    "permDesc": "Description",
+    "permCode": "Technical code",
+    "permDesc": "Permission name",
+    "permDescPlaceholder": "Example: Read questions",
     "addPerm": "Add permission",
     "noPermsYet": "No permissions yet. Add the first permission.",
     "pickRoleFirst": "Select a role on the left to toggle its permissions.",
     "permsForRole": "Permissions for {role}",
-    "accessHint": "Select the permissions available to users with this role.",
+    "accessHint": "Pick permissions by name; the technical code is for APIs only.",
     "deprecated": "Deprecated",
     "systemRoleHint": "System roles cannot be deleted",
     "deleteRoleTitle": "Delete role {role}?",
@@ -439,8 +497,11 @@
     "noUsers": "No users have access to this app yet.",
     "grantAccess": "Grant access",
     "blockAccess": "Block access",
+    "memberUserSearch": "Find user by name",
+    "memberUserSearchPlaceholder": "Type a name or email…",
+    "memberUserEmpty": "No users found",
     "memberUserId": "User ID to grant access",
-    "grantAccessHint": "The backend requires an exact user ID. Granting access does not assign a role automatically.",
+    "grantAccessHint": "Search by name or email, pick a user, then grant access. Granting access does not assign a role automatically.",
     "assignedRoles": "Assigned roles",
     "blockAccessTitle": "Block access for {user}?",
     "blockAccessConfirm": "This user's active sessions for the application will be revoked immediately.",
@@ -449,7 +510,8 @@
     "usersShort": "users",
     "remove": "Remove",
     "tabManagers": "Managers",
-    "managersHint": "Managers can only administer assigned applications; enter a user ID to add one.",
+    "managersHint": "Managers can only administer assigned applications; search by name to add one.",
+    "managerUserSearch": "Find manager by name",
     "managerUserId": "User ID",
     "addManager": "Add manager",
     "noManagers": "No application managers yet.",

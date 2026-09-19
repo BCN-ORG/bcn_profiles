@@ -50,4 +50,6 @@ FE: http://localhost:5173 · locales `/vi`, `/en`
 
 Dùng `be/docker-compose.prod.yml` + network `bcn-infra` — xem `be/docs/DEPLOY.md`.
 
+App khác cần đăng nhập BCN SSO, RBAC và (tuỳ chọn) Timeline: xem **[hướng dẫn tích hợp client app](./be/docs/BCN_CLIENT_APP_INTEGRATION.md)** (chuẩn cho Quiz / Event / Judge / …).
+
 Không commit `.env`, `.env.docker`, `*.pem`, seed data user.

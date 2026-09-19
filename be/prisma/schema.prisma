@@ -105,6 +105,11 @@ enum ApplicationStatus {
   DISABLED
 }
 
+enum AppAccessMode {
+  MANUAL
+  MEMBERS
+}
+
 enum AppAccessStatus {
   ACTIVE
   BLOCKED
@@ -217,6 +222,7 @@ model Application {
   name         String
   clientId     String                    @unique
   status       ApplicationStatus         @default(ACTIVE)
+  accessMode   AppAccessMode             @default(MANUAL)
   require2fa   Boolean                   @default(false)
   createdAt    DateTime                  @default(now())
   updatedAt    DateTime                  @updatedAt
