@@ -930,9 +930,7 @@ export class UsersService implements OnModuleInit {
     return sanitized;
   }
 
-  async searchUsers(
-    query: string,
-  ): Promise<
+  async searchUsers(query: string): Promise<
     {
       id: string;
       fullName: string | null;

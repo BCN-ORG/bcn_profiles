@@ -594,9 +594,7 @@ export class ApplicationsAdminService {
             name: manifest.app.name.trim(),
             clientId: manifest.app.clientId.trim(),
             require2fa: manifest.auth?.require2FA ?? false,
-            ...(manifest.auth?.accessMode !== undefined
-              ? { accessMode }
-              : {}),
+            ...(manifest.auth?.accessMode !== undefined ? { accessMode } : {}),
           },
         })
       : await this.prisma.application.create({

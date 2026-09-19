@@ -77,11 +77,13 @@ export class AuthorizationService {
       where: { userId_applicationId: { userId, applicationId: appId } },
     });
     const expired =
-      Boolean(access?.expiresAt) &&
-      access!.expiresAt!.getTime() <= Date.now();
+      Boolean(access?.expiresAt) && access!.expiresAt!.getTime() <= Date.now();
 
     if (app.accessMode === 'MEMBERS') {
-      if (access?.status === 'BLOCKED' || (access?.status === 'ACTIVE' && expired)) {
+      if (
+        access?.status === 'BLOCKED' ||
+        (access?.status === 'ACTIVE' && expired)
+      ) {
         throw new ForbiddenException({
           code: 'APP_ACCESS_DENIED',
           message: 'Application access is denied',

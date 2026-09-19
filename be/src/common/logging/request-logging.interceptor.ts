@@ -37,7 +37,13 @@ export class RequestLoggingInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
-        this.logRequest(request, method, url, response.statusCode, Date.now() - startedAt);
+        this.logRequest(
+          request,
+          method,
+          url,
+          response.statusCode,
+          Date.now() - startedAt,
+        );
       }),
       catchError((error: unknown) => {
         const status = this.extractStatusCode(error, response.statusCode);

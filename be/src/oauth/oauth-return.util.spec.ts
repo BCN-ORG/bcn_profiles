@@ -45,8 +45,8 @@ describe('oauth-return.util', () => {
   });
 
   it('extracts app origin from any client redirect_uri', () => {
-    expect(
-      safeAppOrigin('https://event.bcn.id.vn/api/auth/callback?x=1'),
-    ).toBe('https://event.bcn.id.vn');
+    expect(safeAppOrigin('https://event.bcn.id.vn/api/auth/callback?x=1')).toBe(
+      'https://event.bcn.id.vn',
+    );
   });
 });

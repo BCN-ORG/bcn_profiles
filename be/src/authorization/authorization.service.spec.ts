@@ -51,17 +51,21 @@ describe('AuthorizationService', () => {
         deleteMany: jest.fn(),
       },
       appRole: {
-        findUnique: jest.fn().mockImplementation((args: { where?: { applicationId_code?: { code?: string } } }) => {
-          const code = args?.where?.applicationId_code?.code;
-          if (code === 'MEMBER') {
-            return Promise.resolve(
-              overrides?.memberRole === undefined
-                ? { id: 'role-member' }
-                : overrides.memberRole,
-            );
-          }
-          return Promise.resolve({ id: 'role-admin', code: 'ADMIN' });
-        }),
+        findUnique: jest
+          .fn()
+          .mockImplementation(
+            (args: { where?: { applicationId_code?: { code?: string } } }) => {
+              const code = args?.where?.applicationId_code?.code;
+              if (code === 'MEMBER') {
+                return Promise.resolve(
+                  overrides?.memberRole === undefined
+                    ? { id: 'role-member' }
+                    : overrides.memberRole,
+                );
+              }
+              return Promise.resolve({ id: 'role-admin', code: 'ADMIN' });
+            },
+          ),
       },
       authAuditLog: { create: jest.fn() },
     };
@@ -157,9 +161,9 @@ describe('AuthorizationService', () => {
   describe('assertAccess accessMode', () => {
     it('MANUAL denies when access row is missing', async () => {
       const { service } = setup([], { accessMode: 'MANUAL', access: null });
-      await expect(service.assertAccess('user-1', 'app-quiz')).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertAccess('user-1', 'app-quiz'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('MEMBERS creates access row when missing then allows', async () => {
@@ -168,7 +172,9 @@ describe('AuthorizationService', () => {
         access: null,
         memberRole: null,
       });
-      await expect(service.assertAccess('user-1', 'app-quiz')).resolves.toBeUndefined();
+      await expect(
+        service.assertAccess('user-1', 'app-quiz'),
+      ).resolves.toBeUndefined();
       expect(prisma.userAppAccess.create).toHaveBeenCalled();
       expect(prisma.userAppRole.create).not.toHaveBeenCalled();
     });
@@ -178,7 +184,9 @@ describe('AuthorizationService', () => {
         accessMode: 'MEMBERS',
         access: { status: 'BLOCKED', expiresAt: null },
       });
-      await expect(service.assertAccess('user-1', 'app-quiz')).rejects.toMatchObject({
+      await expect(
+        service.assertAccess('user-1', 'app-quiz'),
+      ).rejects.toMatchObject({
         response: { code: 'APP_ACCESS_DENIED' },
       });
     });
