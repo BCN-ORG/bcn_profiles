@@ -1,4 +1,4 @@
-import { request } from '@/lib/api';
+import { request } from "@/lib/api";
 import type {
   AuditLog,
   Identity,
@@ -7,17 +7,18 @@ import type {
   UserApplication,
   UserSession,
   TimelineEventType,
-} from '@/types';
+  PublicProfile,
+} from "@/types";
 
 export const TIMELINE_EVENT_TYPES = [
-  'JOIN_BCN',
-  'COURSE_COMPLETE',
-  'QUIZ_COMPLETE',
-  'PROJECT_COMPLETE',
-  'SEMESTER_COMPLETE',
+  "JOIN_BCN",
+  "COURSE_COMPLETE",
+  "QUIZ_COMPLETE",
+  "PROJECT_COMPLETE",
+  "SEMESTER_COMPLETE",
 ] as const satisfies readonly TimelineEventType[];
 
-export type { TimelineEventType } from '@/types';
+export type { TimelineEventType } from "@/types";
 
 export type TimelineEvent = {
   id: number;
@@ -29,13 +30,13 @@ export type TimelineEvent = {
 };
 
 export const authService = {
-  me: () => request.get<{ user: User }>('/auth/me').then((r) => r.user),
+  me: () => request.get<{ user: User }>("/auth/me").then((r) => r.user),
   register: (body: {
     email: string;
     password: string;
     fullName: string;
     phone: string;
-  }) => request.post('/auth/register', body),
+  }) => request.post("/auth/register", body),
   login: (email: string, password: string) =>
     request.post<{
       requiresTwoFactorSetup?: boolean;
@@ -43,28 +44,28 @@ export const authService = {
       setupToken?: string;
       verificationToken?: string;
       user?: User;
-    }>('/auth/login', { email, password }),
-  logout: () => request.post('/auth/logout'),
-  refresh: () => request.post('/auth/refresh'),
+    }>("/auth/login", { email, password }),
+  logout: () => request.post("/auth/logout"),
+  refresh: () => request.post("/auth/refresh"),
   forgotPassword: (email: string) =>
-    request.post('/auth/forgot-password', { email }),
+    request.post("/auth/forgot-password", { email }),
   resetPassword: (email: string, otp: string, newPassword: string) =>
-    request.post('/auth/reset-password', { email, otp, newPassword }),
+    request.post("/auth/reset-password", { email, otp, newPassword }),
   requestEmailChange: (newEmail: string) =>
-    request.post('/auth/change-email/request', { newEmail }),
+    request.post("/auth/change-email/request", { newEmail }),
   confirmEmailChange: (newEmail: string, otp: string) =>
-    request.post('/auth/change-email/confirm', { newEmail, otp }),
+    request.post("/auth/change-email/confirm", { newEmail, otp }),
   beginSocial: (provider: string, returnTo?: string | null) => {
     const q =
       returnTo && returnTo.trim()
         ? `?return_to=${encodeURIComponent(returnTo.trim())}`
-        : '';
+        : "";
     return request.get<{ authorizationUrl: string }>(
       `/auth/social/${provider.toLowerCase()}${q}`,
     );
   },
   verify2fa: (
-    method: 'totp' | 'email' | 'backup-code',
+    method: "totp" | "email" | "backup-code",
     code: string,
     token: string,
   ) =>
@@ -74,31 +75,31 @@ export const authService = {
       { Authorization: `Bearer ${token}` },
     ),
   sendEmailOtp: (token: string) =>
-    request.post('/auth/2fa/send-email-otp', undefined, {
+    request.post("/auth/2fa/send-email-otp", undefined, {
       Authorization: `Bearer ${token}`,
     }),
   setupInitiate: (password: string, token: string) =>
     request.post<{ secret: string; qrCode: string; setupToken: string }>(
-      '/auth/2fa/setup/initiate',
+      "/auth/2fa/setup/initiate",
       { password },
       { Authorization: `Bearer ${token}` },
     ),
   setupConfirm: (code: string, secret: string, token: string) =>
     request.post<{ backupCodes: string[] }>(
-      '/auth/2fa/setup/confirm',
+      "/auth/2fa/setup/confirm",
       { code, secret },
       { Authorization: `Bearer ${token}` },
     ),
   recoveryRequest: (email: string) =>
-    request.post('/auth/2fa/recovery/request', { email }),
+    request.post("/auth/2fa/recovery/request", { email }),
   recoveryVerify: (email: string, recoveryOtp: string) =>
-    request.post<{ recoveryToken: string }>('/auth/2fa/recovery/verify-email', {
+    request.post<{ recoveryToken: string }>("/auth/2fa/recovery/verify-email", {
       email,
       recoveryOtp,
     }),
   recoveryReset: (password: string, recoveryToken: string) =>
     request.post(
-      '/auth/2fa/recovery/reset',
+      "/auth/2fa/recovery/reset",
       { password },
       { Authorization: `Bearer ${recoveryToken}` },
     ),
@@ -110,8 +111,12 @@ export const profileService = {
     phone?: string;
     avatar?: string | null;
     avatarPublicId?: string | null;
-    metadata?: { onboardingVersion?: number };
-  }) => request.patch<{ users: User }>('/users/me', data).then((r) => r.users),
+    metadata?: NonNullable<User["metadata"]>;
+  }) => request.patch<{ users: User }>("/users/me", data).then((r) => r.users),
+  publicProfile: (id: string) =>
+    request
+      .get<{ user: PublicProfile }>(`/users/${encodeURIComponent(id)}/profile`)
+      .then((r) => r.user),
   avatarSignature: () =>
     request.post<{
       uploadUrl: string;
@@ -120,19 +125,19 @@ export const profileService = {
       method: string;
       maxBytes: number;
       expiresAt: string;
-    }>('/users/me/avatar/upload-signature', {}),
+    }>("/users/me/avatar/upload-signature", {}),
   setAvatar: (avatar: string, avatarPublicId: string) =>
     request
-      .patch<{ users: User }>('/users/me/avatar', {
+      .patch<{ users: User }>("/users/me/avatar", {
         avatar,
         avatarPublicId,
       })
       .then((r) => r.users),
-  clearAvatar: () => request.delete<{ users: User }>('/users/me/avatar'),
+  clearAvatar: () => request.delete<{ users: User }>("/users/me/avatar"),
 };
 
 export const identityService = {
-  list: () => request.get<Identity[]>('/me/identities'),
+  list: () => request.get<Identity[]>("/me/identities"),
   link: (provider: string) =>
     request.post<{ authorizationUrl: string }>(
       `/me/identities/${provider.toLowerCase()}/link`,
@@ -144,15 +149,15 @@ export const identityService = {
 };
 
 export const membershipService = {
-  get: () => request.get<MembershipStatus>('/me/membership'),
-  recheck: () => request.post<MembershipStatus>('/me/membership/recheck'),
+  get: () => request.get<MembershipStatus>("/me/membership"),
+  recheck: () => request.post<MembershipStatus>("/me/membership/recheck"),
   adminGet: (userId: string) =>
     request.get<MembershipStatus>(`/admin/users/${userId}/membership`),
   adminRecheck: (userId: string) =>
     request.post<MembershipStatus>(`/admin/users/${userId}/membership/recheck`),
   override: (
     userId: string,
-    body: { status: 'ALLOW' | 'DENY'; reason: string; expiresAt: string },
+    body: { status: "ALLOW" | "DENY"; reason: string; expiresAt: string },
   ) =>
     request.post<MembershipStatus>(
       `/admin/users/${userId}/membership/override`,
@@ -161,7 +166,7 @@ export const membershipService = {
 };
 
 export const applicationService = {
-  mine: () => request.get<UserApplication[]>('/me/applications'),
+  mine: () => request.get<UserApplication[]>("/me/applications"),
   adminList: (userId: string) =>
     request.get<UserApplication[]>(`/admin/users/${userId}/applications`),
   grant: (userId: string, app: string) =>
@@ -177,10 +182,10 @@ export const applicationService = {
 };
 
 export const sessionService = {
-  list: () => request.get<UserSession[]>('/me/sessions'),
+  list: () => request.get<UserSession[]>("/me/sessions"),
   revoke: (sid: string) => request.post(`/me/sessions/${sid}/revoke`),
   revokeOthers: () =>
-    request.post<{ revoked: number }>('/me/sessions/revoke-others'),
+    request.post<{ revoked: number }>("/me/sessions/revoke-others"),
 };
 
 export const securityService = {
@@ -189,20 +194,20 @@ export const securityService = {
       twoFactorEnabled: boolean;
       twoFactorRequired?: boolean;
       backupCodesRemaining?: number;
-    }>('/auth/2fa/me/status'),
+    }>("/auth/2fa/me/status"),
   enableInitiate: (password: string) =>
     request.post<{ secret: string; qrCode: string; setupToken: string }>(
-      '/auth/2fa/me/enable/initiate',
+      "/auth/2fa/me/enable/initiate",
       { password },
     ),
   enableConfirm: (code: string, secret: string, setupToken: string) =>
     request.post<{ backupCodes?: string[] }>(
-      '/auth/2fa/me/enable/confirm',
+      "/auth/2fa/me/enable/confirm",
       { code, secret },
       { Authorization: `Bearer ${setupToken}` },
     ),
   disable: (password: string, totpCode: string) =>
-    request.post('/auth/2fa/me/disable', { password, totpCode }),
+    request.post("/auth/2fa/me/disable", { password, totpCode }),
   adminStatus: (userId: string) =>
     request.get<{
       twoFactorEnabled: boolean;
@@ -224,10 +229,10 @@ export type UserSearchHit = {
 };
 
 export const adminUserService = {
-  list: (search = '', opts?: { pending?: boolean; page?: number }) => {
+  list: (search = "", opts?: { pending?: boolean; page?: number }) => {
     const q = new URLSearchParams({
       page: String(opts?.page ?? 1),
-      limit: '50',
+      limit: "50",
       search,
     });
     const path = opts?.pending ? `/users/pending?${q}` : `/users?${q}`;
@@ -235,11 +240,11 @@ export const adminUserService = {
   },
   search: (q: string) =>
     request
-      .get<{ users: UserSearchHit[] }>(
-        `/users/search?q=${encodeURIComponent(q.trim())}`,
-      )
+      .get<{
+        users: UserSearchHit[];
+      }>(`/users/search?q=${encodeURIComponent(q.trim())}`)
       .then((r) => r.users ?? []),
-  count: () => request.get<{ count: number }>('/users/count'),
+  count: () => request.get<{ count: number }>("/users/count"),
   get: (id: string) =>
     request.get<{ users: User }>(`/users/${id}`).then((r) => r.users),
   create: (body: {
@@ -247,7 +252,7 @@ export const adminUserService = {
     password: string;
     fullName?: string;
     phone?: string;
-  }) => request.post('/users', body),
+  }) => request.post("/users", body),
   remove: (id: string) => request.delete(`/users/${id}`),
   approve: (id: string) => request.patch(`/users/${id}/approve`),
   reject: (id: string) => request.delete(`/users/${id}/reject`),
@@ -258,7 +263,7 @@ export const adminUserService = {
 export type RbacClientSecret = {
   id: string;
   label: string | null;
-  status: 'ACTIVE' | 'DISABLED';
+  status: "ACTIVE" | "DISABLED";
   createdAt: string;
   disabledAt?: string | null;
 };
@@ -271,9 +276,9 @@ export type RbacApplication = {
   clientSecret?: string;
   clientSecretId?: string;
   clientSecrets?: RbacClientSecret[];
-  status: 'ACTIVE' | 'DISABLED';
+  status: "ACTIVE" | "DISABLED";
   require2fa: boolean;
-  accessMode: 'MANUAL' | 'MEMBERS';
+  accessMode: "MANUAL" | "MEMBERS";
   redirectUris: { id: string; redirectUri: string }[];
   roles: {
     id: string;
@@ -312,7 +317,7 @@ export type RbacAppUser = {
 };
 
 export const rbacService = {
-  listApps: () => request.get<RbacApplication[]>('/admin/applications'),
+  listApps: () => request.get<RbacApplication[]>("/admin/applications"),
   getApp: (code: string) =>
     request.get<RbacApplication>(`/admin/applications/${code}`),
   createApp: (body: {
@@ -320,9 +325,9 @@ export const rbacService = {
     name: string;
     clientId: string;
     require2fa?: boolean;
-    accessMode?: 'MANUAL' | 'MEMBERS';
+    accessMode?: "MANUAL" | "MEMBERS";
     redirectUri?: string;
-  }) => request.post<RbacApplication>('/admin/applications', body),
+  }) => request.post<RbacApplication>("/admin/applications", body),
   createClientSecret: (code: string, body: { label?: string } = {}) =>
     request.post<RbacClientSecret & { clientSecret: string }>(
       `/admin/applications/${code}/client-secrets`,
@@ -331,7 +336,7 @@ export const rbacService = {
   setClientSecretStatus: (
     code: string,
     secretId: string,
-    status: 'ACTIVE' | 'DISABLED',
+    status: "ACTIVE" | "DISABLED",
   ) =>
     request.patch<RbacClientSecret>(
       `/admin/applications/${code}/client-secrets/${secretId}`,
@@ -342,9 +347,9 @@ export const rbacService = {
     body: {
       name?: string;
       clientId?: string;
-      status?: 'ACTIVE' | 'DISABLED';
+      status?: "ACTIVE" | "DISABLED";
       require2fa?: boolean;
-      accessMode?: 'MANUAL' | 'MEMBERS';
+      accessMode?: "MANUAL" | "MEMBERS";
     },
   ) => request.patch<RbacApplication>(`/admin/applications/${code}`, body),
   addRedirectUri: (code: string, redirectUri: string) =>
@@ -384,16 +389,16 @@ export const rbacService = {
   removeManager: (code: string, userId: string) =>
     request.delete(`/admin/applications/${code}/managers/${userId}`),
   importManifest: (content: string) =>
-    request.post<RbacApplication>('/admin/applications/import', { content }),
+    request.post<RbacApplication>("/admin/applications/import", { content }),
 };
 
 export const auditService = {
   list: (params: { userId?: string; page?: number; limit?: number } = {}) => {
     const query = new URLSearchParams();
-    if (params.userId) query.set('userId', params.userId);
-    if (params.page) query.set('page', String(params.page));
-    if (params.limit) query.set('limit', String(params.limit));
-    const suffix = query.toString() ? `?${query}` : '';
+    if (params.userId) query.set("userId", params.userId);
+    if (params.page) query.set("page", String(params.page));
+    if (params.limit) query.set("limit", String(params.limit));
+    const suffix = query.toString() ? `?${query}` : "";
     return request.get<{
       data: AuditLog[];
       meta: { total: number; page: number; limit: number; totalPages: number };
@@ -406,14 +411,17 @@ export const timelineService = {
     request.get<TimelineEvent[]>(
       `/timeline-events/my-timeline?page=${page}&limit=${limit}`,
     ),
-  createForUser: (userId: string, body: {
-    eventType: TimelineEventType;
-    title: string;
-    metadata?: Record<string, unknown>;
-  }) => request.post<TimelineEvent>(`/timeline-events/users/${userId}`, body),
+  createForUser: (
+    userId: string,
+    body: {
+      eventType: TimelineEventType;
+      title: string;
+      metadata?: Record<string, unknown>;
+    },
+  ) => request.post<TimelineEvent>(`/timeline-events/users/${userId}`, body),
   update: (
     id: number,
-    body: Partial<Pick<TimelineEvent, 'eventType' | 'title' | 'metadata'>>,
+    body: Partial<Pick<TimelineEvent, "eventType" | "title" | "metadata">>,
   ) => request.patch<TimelineEvent>(`/timeline-events/${id}`, body),
   remove: (id: number) => request.delete(`/timeline-events/${id}`),
 };

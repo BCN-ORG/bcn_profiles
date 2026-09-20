@@ -15,7 +15,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
 
 - App: http://localhost:5173 → mặc định Next.js là http://localhost:3000 (đổi port nếu trùng BE: `pnpm dev -- -p 5173`)
-- Locales: `/vi/...`, `/en/...`
+- Locales: stored in `localStorage` (`bcn-locale`) + cookie `NEXT_LOCALE` (no `/vi` or `/en` in the URL)
 
 Các màn hình MVP:
 

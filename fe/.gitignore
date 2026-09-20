@@ -1,5 +1,6 @@
 # BCN Account Center frontend
 .next/
+.next-dev/
 out/
 node_modules/
 dist/

@@ -252,7 +252,7 @@ Cookie `access_token` + `refresh_token` được cập nhật. **Refresh cũ b�
 
 ### POST `/auth/forgot-password`
 
-Gửi OTP 6 chữ số đến email để reset mật khẩu. OTP có hiệu lực 15 phút.
+Gửi OTP 6 chữ số đến email để reset mật khẩu. OTP có hiệu lực 5 phút.
 
 **Auth:** Public  
 **Rate limit:** 30 req / phút
@@ -269,8 +269,8 @@ Gửi OTP 6 chữ số đến email để reset mật khẩu. OTP có hiệu l�
 
 ```json
 {
-  "message": "Mã OTP đang được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.",
-  "expiresIn": "15 phút"
+  "message": "Nếu email tồn tại trong hệ thống, mã OTP sẽ được gửi đến hộp thư của bạn.",
+  "expiresIn": "5 phút"
 }
 ```
 
@@ -331,8 +331,8 @@ Bước 1 của đổi email: gửi OTP đến địa chỉ email mới để x�
 
 ```json
 {
-  "message": "Mã OTP đang được gửi đến newemail@example.com. Vui lòng kiểm tra hộp thư.",
-  "expiresIn": "15 phút"
+  "message": "Mã OTP đã được gửi đến newemail@example.com. Vui lòng kiểm tra hộp thư.",
+  "expiresIn": "5 phút"
 }
 ```
 
@@ -729,7 +729,7 @@ Cookie `access_token` + `refresh_token` được set. `verificationToken` bị c
 
 **Errors:**
 
-- `401` — OTP không chính xác hoặc đã hết hạn (OTP có hiệu lực 15 phút), hoặc token đã dùng
+- `401` — OTP không chính xác hoặc đã hết hạn (OTP có hiệu lực 5 phút), hoặc token đã dùng
 
 ---
 
@@ -1294,9 +1294,11 @@ Lấy thông tin đầy đủ của một user, bao gồm toàn bộ timeline ev
 
 ### GET `/users/:id/profile`
 
-Lấy profile công khai của một user khác. Không trả về thông tin nhạy cảm như `phone`, `metadata`, `googleId`.
+Lấy hồ sơ công khai của một thành viên ACTIVE. Không cần đăng nhập.
 
-**Auth:** JWT cookie (bất kỳ role)
+Không trả về `email`, `phone`, `role`, `status`, `googleId`, `metadata` thô, hay `timelineEvents.metadata`.
+
+**Auth:** Public
 
 **Success (200):**
 
@@ -1304,18 +1306,23 @@ Lấy profile công khai của một user khác. Không trả về thông tin nh
 {
   "user": {
     "id": "uuid",
-    "email": "user@example.com",
     "fullName": "Nguyễn Văn A",
     "avatar": "https://...",
-    "role": "USER",
-    "status": "ACTIVE",
     "createdAt": "2026-01-01T00:00:00.000Z",
+    "bio": "Mô tả ngắn",
+    "cohort": "K22",
+    "communityRole": "Thành viên",
+    "profile3dEnabled": true,
+    "socialLinks": {
+      "github": "https://github.com/username",
+      "website": "https://example.com"
+    },
     "timelineEvents": [
       {
         "id": 3,
         "eventType": "PROJECT_COMPLETE",
         "title": "...",
-        "metadata": {},
+        "sourceApp": "BCN_QUIZ",
         "createdAt": "..."
       }
     ]
@@ -1323,9 +1330,11 @@ Lấy profile công khai của một user khác. Không trả về thông tin nh
 }
 ```
 
+`socialLinks` chỉ chứa các URL đã có. `profile3dEnabled` mặc định `true` nếu user chưa tắt. User `PENDING` / `BLOCKED` / không tồn tại đều trả `404`.
+
 **Errors:**
 
-- `404` — User không tồn tại
+- `404` — User không tồn tại hoặc không ACTIVE
 
 ---
 
@@ -1389,7 +1398,7 @@ Cập nhật thông tin cá nhân của bản thân. Tất cả fields đều op
   "phone": "0999888777",
   "metadata": {
     "bio": "Mô tả bản thân",
-    "status": "Đang học NestJS",
+    "profile3dEnabled": true,
     "facebook": "https://facebook.com/username",
     "instagram": "https://instagram.com/username",
     "tiktok": "https://tiktok.com/@username",
@@ -1403,6 +1412,8 @@ Cập nhật thông tin cá nhân của bản thân. Tất cả fields đều op
 ```
 
 > **`metadata` được merge** — chỉ cần gửi field muốn thay đổi, các field còn lại giữ nguyên. Ví dụ chỉ gửi `{ "metadata": { "bio": "Hello" } }` thì chỉ `bio` được cập nhật, `github`, `facebook`... vẫn giữ nguyên giá trị cũ.
+>
+> Field public dùng cho hồ sơ: `bio` (max 500), `profile3dEnabled`, và các URL `github` / `linkedin` / `website` / `facebook` / `instagram` / `tiktok` / `youtube` / `twitter`. `cohort` và `communityRole` cũng nằm trong `metadata` (thường do seed/admin ghi).
 
 **Success (200):**
 
@@ -1520,11 +1531,11 @@ Xóa vĩnh viễn một user. Admin không thể tự xóa chính mình.
 
 **Base URL:** `https://profiles.bcn.id.vn/api` (local: `http://localhost:3000/api`). Cả ba endpoint yêu cầu cookie `access_token`, role USER hoặc ADMIN; Profiles không nhận Bearer access token cho các endpoint này.
 
-| Method | Endpoint | Kết quả |
-| --- | --- | --- |
-| POST | `/users/me/avatar/upload-signature` | Xin URL PUT/GET, bucket `profiles`, folder `user-avatars/<userId>/` (folder có thể cấu hình phía backend) |
-| PATCH | `/users/me/avatar` | Gắn ảnh đã upload vào tài khoản hiện tại |
-| DELETE | `/users/me/avatar` | Xóa avatar đã gắn trong DB và yêu cầu xóa object MinIO |
+| Method | Endpoint                            | Kết quả                                                                                                   |
+| ------ | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| POST   | `/users/me/avatar/upload-signature` | Xin URL PUT/GET, bucket `profiles`, folder `user-avatars/<userId>/` (folder có thể cấu hình phía backend) |
+| PATCH  | `/users/me/avatar`                  | Gắn ảnh đã upload vào tài khoản hiện tại                                                                  |
+| DELETE | `/users/me/avatar`                  | Xóa avatar đã gắn trong DB và yêu cầu xóa object MinIO                                                    |
 
 Giới hạn ảnh mặc định **2 MiB (2097152 byte)**, có thể cấu hình; FE luôn đọc `maxBytes` từ response. Signature chứa key dạng `user-avatars/<userId>/upload-<uuid>` và `secureUrl` dạng `https://storage.bcn.id.vn/profiles/user-avatars/<userId>/upload-<uuid>`.
 
@@ -1539,17 +1550,17 @@ Cập nhật ngày **2026-09-12**. Upload trực tiếp là **PUT raw file**, kh
 
 Các trường trong `data`:
 
-| Trường | FE sử dụng |
-| --- | --- |
-| `provider` | `"minio"` |
-| `method` | `"PUT"` |
-| `uploadUrl` | URL có chữ ký để upload, hiệu lực 300 giây |
-| `downloadUrl` | URL có chữ ký GET, hiệu lực 300 giây; dùng preview sau PUT |
-| `secureUrl` | URL cố định, không có query; dùng lưu DB |
-| `publicId` | Toàn bộ object key, gồm folder và UUID; giữ nguyên |
-| `maxBytes` | Giới hạn chính xác theo byte, ưu tiên giá trị response |
-| `maxFileSizeMb` | `maxBytes / 1024 / 1024`, dùng hiển thị giới hạn |
-| `expiresAt` | ISO timestamp để FE kiểm tra URL upload hết hạn |
+| Trường          | FE sử dụng                                                 |
+| --------------- | ---------------------------------------------------------- |
+| `provider`      | `"minio"`                                                  |
+| `method`        | `"PUT"`                                                    |
+| `uploadUrl`     | URL có chữ ký để upload, hiệu lực 300 giây                 |
+| `downloadUrl`   | URL có chữ ký GET, hiệu lực 300 giây; dùng preview sau PUT |
+| `secureUrl`     | URL cố định, không có query; dùng lưu DB                   |
+| `publicId`      | Toàn bộ object key, gồm folder và UUID; giữ nguyên         |
+| `maxBytes`      | Giới hạn chính xác theo byte, ưu tiên giá trị response     |
+| `maxFileSizeMb` | `maxBytes / 1024 / 1024`, dùng hiển thị giới hạn           |
+| `expiresAt`     | ISO timestamp để FE kiểm tra URL upload hết hạn            |
 
 **URL lưu DB và URL download:** Không lưu `uploadUrl`/`downloadUrl` vào metadata. `secureUrl` chỉ mở trực tiếp được nếu quyền đọc object cho phép. API đọc avatar/ảnh/file hiện trả URL đã lưu, không tự tạo chữ ký GET mới; hiện chưa có endpoint công khai để xin lại `downloadUrl` cho object cũ. Với bucket private, FE cần API cấp URL đọc mới trước khi triển khai xem/download lâu dài; không dùng presigned URL đã hết hạn.
 
@@ -1595,12 +1606,19 @@ async function uploadToMinio(apiBase, signaturePath, file) {
 
 ```javascript
 const apiBase = 'https://profiles.bcn.id.vn/api';
-const signed = await uploadToMinio(apiBase, '/users/me/avatar/upload-signature', file);
+const signed = await uploadToMinio(
+  apiBase,
+  '/users/me/avatar/upload-signature',
+  file,
+);
 const saveResponse = await fetch(`${apiBase}/users/me/avatar`, {
   method: 'PATCH',
   credentials: 'include',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ avatar: signed.secureUrl, avatarPublicId: signed.publicId }),
+  body: JSON.stringify({
+    avatar: signed.secureUrl,
+    avatarPublicId: signed.publicId,
+  }),
 });
 const result = await saveResponse.json();
 if (!saveResponse.ok) throw new Error(JSON.stringify(result.message));
@@ -1770,8 +1788,8 @@ Xóa timeline event. Chỉ admin mới có quyền xóa.
 
 ### Cookie settings
 
-| Cookie          | Max-Age | HttpOnly | Secure    | SameSite | Domain (prod)                                       |
-| --------------- | ------- | -------- | --------- | -------- | --------------------------------------------------- |
+| Cookie          | Max-Age | HttpOnly | Secure    | SameSite | Domain (prod)                                                   |
+| --------------- | ------- | -------- | --------- | -------- | --------------------------------------------------------------- |
 | `access_token`  | 60 phút | ✅       | ✅ (prod) | `none`   | Host-only trên `profiles.bcn.id.vn`; domain USIDE theo host API |
 | `refresh_token` | 7 ngày  | ✅       | ✅ (prod) | `none`   | Host-only trên `profiles.bcn.id.vn`; domain USIDE theo host API |
 

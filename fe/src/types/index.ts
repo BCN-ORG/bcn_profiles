@@ -1,9 +1,9 @@
 export type TimelineEventType =
-  | 'JOIN_BCN'
-  | 'COURSE_COMPLETE'
-  | 'QUIZ_COMPLETE'
-  | 'PROJECT_COMPLETE'
-  | 'SEMESTER_COMPLETE';
+  | "JOIN_BCN"
+  | "COURSE_COMPLETE"
+  | "QUIZ_COMPLETE"
+  | "PROJECT_COMPLETE"
+  | "SEMESTER_COMPLETE";
 
 export type User = {
   id: string;
@@ -11,8 +11,8 @@ export type User = {
   fullName?: string;
   phone?: string;
   avatar?: string;
-  role: 'USER' | 'ADMIN';
-  status?: 'PENDING' | 'ACTIVE' | 'BLOCKED' | 'DISABLED';
+  role: "USER" | "ADMIN";
+  status?: "PENDING" | "ACTIVE" | "BLOCKED" | "DISABLED";
   createdAt?: string;
   twoFactorEnabled?: boolean;
   timelineEvents?: Array<{
@@ -27,12 +27,55 @@ export type User = {
     onboardingVersion?: number;
     maSV?: string;
     ngaySinh?: string;
+    bio?: string;
+    cohort?: string;
+    communityRole?: string;
+    profile3dEnabled?: boolean;
+    facebook?: string;
+    instagram?: string;
+    tiktok?: string;
+    youtube?: string;
+    github?: string;
+    linkedin?: string;
+    twitter?: string;
+    website?: string;
     [key: string]: unknown;
   } | null;
 };
 
+export type PublicProfile = {
+  id: string;
+  fullName?: string | null;
+  avatar?: string | null;
+  createdAt: string;
+  bio?: string;
+  cohort?: string;
+  communityRole?: string;
+  profile3dEnabled: boolean;
+  socialLinks: Partial<
+    Record<
+      | "facebook"
+      | "instagram"
+      | "tiktok"
+      | "youtube"
+      | "github"
+      | "linkedin"
+      | "twitter"
+      | "website",
+      string
+    >
+  >;
+  timelineEvents: Array<{
+    id: number;
+    eventType: TimelineEventType;
+    title: string;
+    sourceApp?: string | null;
+    createdAt: string;
+  }>;
+};
+
 export type Identity = {
-  provider: 'GOOGLE' | 'GITHUB' | 'DISCORD' | 'ZALO';
+  provider: "GOOGLE" | "GITHUB" | "DISCORD" | "ZALO";
   providerEmail?: string;
   providerUsername?: string;
   providerDisplayName?: string;
@@ -41,17 +84,17 @@ export type Identity = {
   lastSyncedAt?: string;
 };
 
-export type SourceStatus = 'VERIFIED' | 'NOT_MEMBER' | 'PENDING' | 'UNKNOWN';
+export type SourceStatus = "VERIFIED" | "NOT_MEMBER" | "PENDING" | "UNKNOWN";
 
 export type MembershipStatus = {
   eligible: boolean;
-  policy: 'ANY_TRUSTED_GROUP';
+  policy: "ANY_TRUSTED_GROUP";
   sources: {
     discord?: { status: SourceStatus; checkedAt?: string };
     zalo?: { status: SourceStatus; checkedAt?: string };
   };
   override?: {
-    status: 'ALLOW' | 'DENY';
+    status: "ALLOW" | "DENY";
     expiresAt: string;
     reason?: string;
   } | null;
@@ -61,7 +104,7 @@ export type MembershipStatus = {
 export type UserApplication = {
   code: string;
   name: string;
-  access: 'ACTIVE' | 'BLOCKED' | 'PENDING';
+  access: "ACTIVE" | "BLOCKED" | "PENDING";
   roles: string[];
   grantedAt?: string;
   expiresAt?: string;
@@ -69,9 +112,9 @@ export type UserApplication = {
 
 export type UserSession = {
   id: string;
-  type: 'SSO' | 'APP';
+  type: "SSO" | "APP";
   application: string | null;
-  authLevel: 'AAL1' | 'AAL2' | null;
+  authLevel: "AAL1" | "AAL2" | null;
   createdAt: string;
   expiresAt: string;
   current: boolean;

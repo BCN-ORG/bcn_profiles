@@ -1,27 +1,26 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import {
   createContext,
-  Suspense,
   useContext,
   useEffect,
   useState,
   type ReactNode,
 } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { authService } from '@/services';
 import type { User } from '@/types';
-import { Link, usePathname, useRouter } from '@/i18n/navigation';
+import { usePathname, useRouter } from '@/i18n/navigation';
 import { needsOnboarding, isOnboardingExemptPath } from '@/lib/onboarding';
 import {
   clearOauthHandoff,
   readOauthHandoff,
   takeOauthReturn,
 } from '@/lib/oauth-handoff';
-import { Button, Skeleton } from '@/components/ui/primitives';
-import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/primitives';
+
+export { LocaleSwitcher } from '@/components/i18n/locale-controls';
 
 const AuthContext = createContext<{
   user: User | null | undefined;
@@ -165,45 +164,4 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   return <>{children}</>;
-}
-
-function LocaleSwitcherButtons() {
-  const locale = useLocale();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const query = searchParams.toString();
-  const href = query ? `${pathname}?${query}` : pathname;
-
-  return (
-    <div className="inline-flex items-center gap-0.5">
-      {(['vi', 'en'] as const).map((item) => (
-        <Button
-          key={item}
-          asChild
-          variant={locale === item ? 'secondary' : 'ghost'}
-          size="sm"
-          className={cn(
-            'h-7 rounded-full px-2.5 text-[11px] font-semibold tracking-wide',
-            locale === item && 'bg-primary/10 text-primary hover:bg-primary/15',
-          )}
-        >
-          <Link href={href} locale={item}>
-            {item.toUpperCase()}
-          </Link>
-        </Button>
-      ))}
-    </div>
-  );
-}
-
-export function LocaleSwitcher() {
-  return (
-    <Suspense
-      fallback={
-        <div className="inline-flex h-7 w-16 items-center gap-0.5" aria-hidden />
-      }
-    >
-      <LocaleSwitcherButtons />
-    </Suspense>
-  );
 }

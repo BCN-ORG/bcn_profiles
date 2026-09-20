@@ -201,8 +201,8 @@ export class UsersService implements OnModuleInit {
           await this.listCache.setDetail(id, detail);
           await this.listCache.setByEmail(detail.email, detail);
         }
-        if (profile) {
-          await this.listCache.setProfile(id, profile);
+        if (profile?.status === UserStatus.ACTIVE) {
+          await this.listCache.setProfile(id, this.toPublicProfile(profile));
         }
       }
 
@@ -396,12 +396,13 @@ export class UsersService implements OnModuleInit {
     }
 
     const user = await this.queryPublicProfile(id);
-    if (!user) {
+    if (!user || user.status !== UserStatus.ACTIVE) {
       throw new NotFoundException(`User với ID ${id} không tồn tại`);
     }
 
-    await this.listCache.setProfile(id, user);
-    return user;
+    const profile = this.toPublicProfile(user);
+    await this.listCache.setProfile(id, profile);
+    return profile;
   }
 
   async findByEmail(email: string): Promise<UserWithoutPassword | null> {
@@ -488,6 +489,64 @@ export class UsersService implements OnModuleInit {
     });
   }
 
+  private toPublicProfile(user: {
+    id: string;
+    fullName: string | null;
+    avatar: string | null;
+    createdAt: Date;
+    metadata: unknown;
+    timelineEvents: Array<{
+      id: number;
+      eventType: string;
+      title: string;
+      sourceApp: string | null;
+      createdAt: Date;
+    }>;
+  }) {
+    const metadata =
+      typeof user.metadata === 'object' &&
+      user.metadata !== null &&
+      !Array.isArray(user.metadata)
+        ? (user.metadata as Record<string, unknown>)
+        : {};
+    const pick = (key: string) => {
+      const value = metadata[key];
+      return typeof value === 'string' && value.trim()
+        ? value.trim()
+        : undefined;
+    };
+    const socialLinks: Record<string, string> = {};
+    for (const key of [
+      'facebook',
+      'instagram',
+      'tiktok',
+      'youtube',
+      'github',
+      'linkedin',
+      'twitter',
+      'website',
+    ]) {
+      const value = pick(key);
+      if (value) socialLinks[key] = value;
+    }
+
+    return {
+      id: user.id,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      createdAt: user.createdAt,
+      bio: pick('bio'),
+      cohort: pick('cohort'),
+      communityRole: pick('communityRole'),
+      profile3dEnabled:
+        typeof metadata.profile3dEnabled === 'boolean'
+          ? metadata.profile3dEnabled
+          : true,
+      socialLinks,
+      timelineEvents: user.timelineEvents,
+    };
+  }
+
   private async queryPublicProfile(id: string) {
     return this.prisma.user.findUnique({
       relationLoadStrategy: 'join',
@@ -496,9 +555,9 @@ export class UsersService implements OnModuleInit {
         id: true,
         fullName: true,
         avatar: true,
-        role: true,
         status: true,
         createdAt: true,
+        metadata: true,
         timelineEvents: {
           orderBy: {
             createdAt: 'desc',
@@ -508,7 +567,6 @@ export class UsersService implements OnModuleInit {
             id: true,
             eventType: true,
             title: true,
-            metadata: true,
             sourceApp: true,
             createdAt: true,
           },
@@ -605,14 +663,17 @@ export class UsersService implements OnModuleInit {
     await this.sessionCache.invalidateUser(id);
     await this.invalidateListCaches();
 
-    void this.emailService
-      .sendRejectionEmail(user.email, user.fullName || undefined)
-      .catch((error) => {
-        this.logger.error(
-          'Failed to send rejection email in background',
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    try {
+      await this.emailService.sendRejectionEmail(
+        user.email,
+        user.fullName || undefined,
+      );
+    } catch (error) {
+      this.logger.error(
+        'Failed to send rejection email',
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   async approveUser(id: string): Promise<UserWithoutPassword> {
@@ -647,15 +708,18 @@ export class UsersService implements OnModuleInit {
     await this.sessionCache.invalidateUser(id);
     await this.invalidateListCaches();
 
-    void this.emailService
-      .sendApprovalEmail(user.email, user.fullName || undefined)
-      .catch((error) => {
-        // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
-        this.logger.error(
-          'Failed to send approval email in background',
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    try {
+      await this.emailService.sendApprovalEmail(
+        user.email,
+        user.fullName || undefined,
+      );
+    } catch (error) {
+      // Không rollback nếu gửi email lỗi — tài khoản vẫn được duyệt
+      this.logger.error(
+        'Failed to send approval email',
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
 
     return updatedUser;
   }

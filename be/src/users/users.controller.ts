@@ -19,6 +19,7 @@ import { SetAvatarDto } from './dto/set-avatar.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { User } from '../auth/decorators/user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -130,6 +131,7 @@ export class UsersController {
   }
 
   @Get(':id/profile')
+  @Public()
   async getUserPublicProfile(@Param('id') id: string) {
     const user = await this.usersService.getPublicProfile(id);
     return {

@@ -155,3 +155,107 @@ describe('UsersService avatar behavior', () => {
     expect(minio.deleteImage).toHaveBeenCalledWith(oldPublicId);
   });
 });
+
+describe('UsersService public profile', () => {
+  const userId = 'user-1';
+  const listCache = {
+    getProfile: jest.fn(),
+    setProfile: jest.fn(),
+    invalidateAll: jest.fn(),
+  };
+  let prisma: { user: { findUnique: jest.Mock } };
+  let service: UsersService;
+
+  beforeEach(() => {
+    listCache.getProfile.mockReset();
+    listCache.setProfile.mockReset();
+    prisma = {
+      user: {
+        findUnique: jest.fn(),
+      },
+    };
+    service = new UsersService(
+      prisma as never,
+      {} as never,
+      { invalidateUser: jest.fn() } as never,
+      listCache as never,
+      {} as never,
+      { delByPrefix: jest.fn() } as never,
+    );
+  });
+
+  it('returns a public payload without email, status, or raw metadata', async () => {
+    listCache.getProfile.mockResolvedValue(undefined);
+    prisma.user.findUnique.mockResolvedValue({
+      id: userId,
+      fullName: 'Test User',
+      avatar: 'https://cdn.example/avatar.png',
+      status: 'ACTIVE',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      metadata: {
+        bio: ' Hello BCN ',
+        cohort: 'K22',
+        communityRole: 'Thành viên',
+        maSV: '24635361',
+        ngaySinh: '01/01/2004',
+        github: 'https://github.com/bcn',
+        facebook: '',
+        profile3dEnabled: false,
+      },
+      timelineEvents: [
+        {
+          id: 9,
+          eventType: 'JOIN_BCN',
+          title: 'Joined',
+          sourceApp: null,
+          createdAt: new Date('2026-01-02T00:00:00.000Z'),
+        },
+      ],
+    });
+
+    const profile = await service.getPublicProfile(userId);
+
+    expect(profile).toEqual({
+      id: userId,
+      fullName: 'Test User',
+      avatar: 'https://cdn.example/avatar.png',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      bio: 'Hello BCN',
+      cohort: 'K22',
+      communityRole: 'Thành viên',
+      profile3dEnabled: false,
+      socialLinks: { github: 'https://github.com/bcn' },
+      timelineEvents: [
+        {
+          id: 9,
+          eventType: 'JOIN_BCN',
+          title: 'Joined',
+          sourceApp: null,
+          createdAt: new Date('2026-01-02T00:00:00.000Z'),
+        },
+      ],
+    });
+    expect(profile).not.toHaveProperty('email');
+    expect(profile).not.toHaveProperty('status');
+    expect(profile).not.toHaveProperty('metadata');
+    expect(listCache.setProfile).toHaveBeenCalledWith(userId, profile);
+  });
+
+  it('hides inactive members', async () => {
+    listCache.getProfile.mockResolvedValue(undefined);
+    prisma.user.findUnique.mockResolvedValue({
+      id: userId,
+      fullName: 'Pending User',
+      avatar: null,
+      status: 'PENDING',
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      metadata: { maSV: 'secret' },
+      timelineEvents: [],
+    });
+
+    await expect(service.getPublicProfile(userId)).rejects.toThrow(
+      'User với ID user-1 không tồn tại',
+    );
+    expect(listCache.setProfile).not.toHaveBeenCalled();
+  });
+});

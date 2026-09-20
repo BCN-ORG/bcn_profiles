@@ -46,7 +46,7 @@ export class UsersListCacheService {
   }
 
   private profileKey(id: string): string {
-    return `users:profile:${id}`;
+    return `users:profile:v3:${id}`;
   }
 
   private emailKey(email: string): string {
