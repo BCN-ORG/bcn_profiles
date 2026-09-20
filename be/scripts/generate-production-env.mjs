@@ -77,6 +77,12 @@ for (const key of [
 }
 if (values.JWT_SECRET && values.JWT_SECRET === values.JWT_REFRESH_SECRET)
   throw new Error('JWT secrets must be different');
+values.RESEND_API_KEY = values.RESEND_API_KEY.replace(/^["']|["']$/g, '').trim();
+values.EMAIL_FROM = values.EMAIL_FROM.replace(/^["']|["']$/g, '').trim();
+if (!/^re_[A-Za-z0-9_]+$/.test(values.RESEND_API_KEY))
+  throw new Error('RESEND_API_KEY must look like a Resend key (re_...)');
+if (!/^[^<>\s]+(\s+[^<>]+)*\s*<[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+>$|^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/.test(values.EMAIL_FROM))
+  throw new Error('EMAIL_FROM must be an email or "Name <email>"');
 const dbUrl = new URL(
   `postgresql://${values.DB_HOST}:${values.DB_PORT}/${values.DB_DATABASE}`,
 );

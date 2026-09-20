@@ -24,7 +24,18 @@ function fixture() {
       'https://profiles.bcn.id.vn/api/auth/social/discord/callback',
     ZALO_REDIRECT_URI: 'https://profiles.bcn.id.vn/api/auth/social/zalo/callback',
   });
-  const secrets = { DB_PASSWORD: "p@ss:%/#$'\\ word", REDIS_PASSWORD: "'redis${NOT_SET}#\\ password", MINIO_ACCESS_KEY: 'app-key', MINIO_SECRET_KEY: 'app-secret', JWT_SECRET: 'access-secret', JWT_REFRESH_SECRET: 'refresh-secret' };
+  const secrets = {
+    DB_PASSWORD: "p@ss:%/#$'\\ word",
+    REDIS_PASSWORD: "'redis${NOT_SET}#\\ password",
+    MINIO_ACCESS_KEY: 'app-key',
+    MINIO_SECRET_KEY: 'app-secret',
+    JWT_SECRET: 'access-secret',
+    JWT_REFRESH_SECRET: 'refresh-secret',
+    RESEND_API_KEY: 're_test_key_for_ci_validation_only',
+  };
+  Object.assign(vars, {
+    EMAIL_FROM: 'BCN Support <onboarding@uside.id.vn>',
+  });
   return { vars, secrets, PROJECT_NAME: namespace === 'profiles' ? 'bcn_profiles' : 'bcn_quiz' };
 }
 

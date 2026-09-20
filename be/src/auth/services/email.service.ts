@@ -20,17 +20,26 @@ export class EmailService {
   private readonly frontendUrl: string;
 
   constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY')?.trim();
+    const apiKey = this.configService
+      .get<string>('RESEND_API_KEY')
+      ?.trim()
+      .replace(/^["']|["']$/g, '');
     const isProd =
       this.configService.get<string>('NODE_ENV')?.trim() === 'production';
 
-    const configuredFrom = this.configService.get<string>('EMAIL_FROM')?.trim();
+    const configuredFrom = this.configService
+      .get<string>('EMAIL_FROM')
+      ?.trim()
+      .replace(/^["']|["']$/g, '');
     const configuredFrontendUrl = this.configService
       .get<string>('FRONTEND_URL')
       ?.trim();
 
     if (isProd && !apiKey) {
       throw new Error('RESEND_API_KEY environment variable is required');
+    }
+    if (apiKey && !apiKey.startsWith('re_')) {
+      throw new Error('RESEND_API_KEY must start with re_');
     }
     if (isProd && !configuredFrom) {
       throw new Error('EMAIL_FROM environment variable is required');
