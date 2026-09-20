@@ -484,6 +484,7 @@ export class AuthController {
     const isEmailOTPValid = await this.twoFactorAuthService.verifyEmailOTP(
       user.email,
       code,
+      'two-factor-login',
     );
 
     if (!isEmailOTPValid) {
@@ -649,7 +650,10 @@ export class AuthController {
     });
 
     if (user?.twoFactorEnabled && user.status === 'ACTIVE') {
-      await this.twoFactorAuthService.generateAndSendEmailOTP(dto.email);
+      await this.twoFactorAuthService.generateAndSendEmailOTP(
+        dto.email,
+        'two-factor-recovery',
+      );
     }
 
     return generic;
@@ -668,6 +672,7 @@ export class AuthController {
     const isValid = await this.twoFactorAuthService.verifyEmailOTP(
       dto.email,
       dto.recoveryOtp,
+      'two-factor-recovery',
     );
 
     if (!isValid) {
@@ -898,22 +903,19 @@ export class AuthController {
       `Admin reset by ${adminUser.email}: ${dto.reason || 'No reason provided'}`,
     );
 
-    void this.emailService
-      .sendAdminResetNotification(
-        userData.email,
-        userData.fullName || undefined,
-      )
-      .catch((error) => {
-        this.logger.error(
-          'Failed to send admin reset notification in background',
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    const userNotified = await this.sendNotification(
+      () =>
+        this.emailService.sendAdminResetNotification(
+          userData.email,
+          userData.fullName || undefined,
+        ),
+      'Failed to send admin reset notification',
+    );
 
     return {
       success: true,
-      message: `2FA của user ${userId} đã được reset. User sẽ được thông báo via email.`,
-      userNotified: true,
+      message: `2FA của user ${userId} đã được reset.${userNotified ? ' User đã được thông báo qua email.' : ' Không thể gửi email thông báo.'}`,
+      userNotified,
     };
   }
 
@@ -949,19 +951,19 @@ export class AuthController {
     );
 
     // Send notification email to user
-    void this.emailService
-      .sendTwoFactorEnforcedNotification(user.email, user.fullName || undefined)
-      .catch((error) => {
-        this.logger.error(
-          'Failed to send 2FA enforcement notification',
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    const userNotified = await this.sendNotification(
+      () =>
+        this.emailService.sendTwoFactorEnforcedNotification(
+          user.email,
+          user.fullName || undefined,
+        ),
+      'Failed to send 2FA enforcement notification',
+    );
 
     return {
       success: true,
-      message: `User ${userId} bắt buộc phải sử dụng 2FA. User sẽ được thông báo via email.`,
-      userNotified: true,
+      message: `User ${userId} bắt buộc phải sử dụng 2FA.${userNotified ? ' User đã được thông báo qua email.' : ' Không thể gửi email thông báo.'}`,
+      userNotified,
     };
   }
 
@@ -997,20 +999,36 @@ export class AuthController {
     );
 
     // Send notification email to user
-    void this.emailService
-      .sendTwoFactorOptionalNotification(user.email, user.fullName || undefined)
-      .catch((error) => {
-        this.logger.error(
-          'Failed to send 2FA optional notification',
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    const userNotified = await this.sendNotification(
+      () =>
+        this.emailService.sendTwoFactorOptionalNotification(
+          user.email,
+          user.fullName || undefined,
+        ),
+      'Failed to send 2FA optional notification',
+    );
 
     return {
       success: true,
-      message: `User ${userId} không bắt buộc phải sử dụng 2FA nữa. User sẽ được thông báo via email.`,
-      userNotified: true,
+      message: `User ${userId} không bắt buộc phải sử dụng 2FA nữa.${userNotified ? ' User đã được thông báo qua email.' : ' Không thể gửi email thông báo.'}`,
+      userNotified,
     };
+  }
+
+  private async sendNotification(
+    send: () => Promise<void>,
+    errorMessage: string,
+  ): Promise<boolean> {
+    try {
+      await send();
+      return true;
+    } catch (error) {
+      this.logger.error(
+        errorMessage,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return false;
+    }
   }
 
   /**

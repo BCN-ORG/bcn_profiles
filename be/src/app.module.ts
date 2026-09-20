@@ -26,8 +26,7 @@ import { ApplicationManagerGuard } from './authorization/application-manager.gua
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath:
-        process.env.NODE_ENV === 'production' ? '.env.production' : '.env',
+      envFilePath: '.env',
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

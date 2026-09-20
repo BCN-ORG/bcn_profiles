@@ -7,6 +7,7 @@ import { EmailService } from './services/email.service';
 import { TwoFactorAuthService } from './services/two-factor-auth.service';
 import { AuthSessionCacheService } from './services/auth-session-cache.service';
 import { TokenRevocationService } from './services/token-revocation.service';
+import { EmailOtpService } from './services/email-otp.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -28,6 +29,7 @@ describe('AuthService', () => {
           useValue: { get: jest.fn().mockReturnValue('test-secret') },
         },
         { provide: EmailService, useValue: {} },
+        { provide: EmailOtpService, useValue: {} },
         { provide: TwoFactorAuthService, useValue: {} },
         {
           provide: AuthSessionCacheService,

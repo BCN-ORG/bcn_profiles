@@ -65,7 +65,7 @@ BCN Profiles được xây dựng theo kiến trúc module của NestJS, tập t
 ### Authentication & Security
 
 - `@nestjs/jwt`, `passport`, `passport-jwt`, `passport-local`
-- `bcrypt` để hash password/recovery codes/OTP
+- `bcrypt` để hash password/recovery codes; OTP email được ký HMAC và lưu Redis trong 5 phút
 - `helmet`, `@nestjs/throttler`
 - **Redis** (`ioredis`) cho session/user/list/timeline cache + revoke hot path; key prefix `bcn:profiles:`
 

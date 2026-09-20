@@ -9,6 +9,7 @@ import { authService } from '@/services';
 import { useRouter } from '@/i18n/navigation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { OtpCountdown } from '@/components/auth/otp-countdown';
 
 export default function TwoFactorRecoveryPage() {
   const t = useTranslations('recovery');
@@ -20,18 +21,32 @@ export default function TwoFactorRecoveryPage() {
   const [password, setPassword] = useState('');
   const [recoveryToken, setRecoveryToken] = useState('');
   const [busy, setBusy] = useState(false);
+  const [otpSentAt, setOtpSentAt] = useState<number | null>(null);
 
   async function request(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
+    const requestedAt = Date.now();
     try {
       await authService.recoveryRequest(email);
       toast.success(t('otpSent'));
+      setOtpSentAt(requestedAt);
       setStep('verify');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tc('error'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function resendOtp() {
+    const requestedAt = Date.now();
+    try {
+      await authService.recoveryRequest(email);
+      setOtpSentAt(requestedAt);
+      toast.success(t('otpSent'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : tc('error'));
     }
   }
 
@@ -91,12 +106,20 @@ export default function TwoFactorRecoveryPage() {
         ) : null}
         {step === 'verify' ? (
           <div className="space-y-2">
-            <Label>{t('otp')}</Label>
+            <Label htmlFor="recovery-otp">{t('otp')}</Label>
             <Input
+              id="recovery-otp"
               required
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              pattern="[0-9]{6}"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
+              onChange={(e) =>
+                setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+              }
             />
+            <OtpCountdown sentAt={otpSentAt} onResend={resendOtp} />
           </div>
         ) : null}
         {step === 'reset' ? (

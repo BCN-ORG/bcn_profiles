@@ -9,7 +9,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthSessionCacheService } from './services/auth-session-cache.service';
 import { EmailService } from './services/email.service';
-import { MailQueueService } from './services/mail-queue.service';
+import { EmailOtpService } from './services/email-otp.service';
 import { TwoFactorAuthService } from './services/two-factor-auth.service';
 import { AuthChallengeService } from './services/auth-challenge.service';
 import { TokenRevocationService } from './services/token-revocation.service';
@@ -46,8 +46,8 @@ import { MembershipModule } from '../membership/membership.module';
     AuthSessionCacheService,
     AuthChallengeService,
     TokenRevocationService,
-    MailQueueService,
     EmailService,
+    EmailOtpService,
     TwoFactorAuthService,
     TwoFactorSetupGuard,
     TwoFactorVerificationGuard,
@@ -58,7 +58,6 @@ import { MembershipModule } from '../membership/membership.module';
     AuthSessionCacheService,
     TwoFactorAuthService,
     EmailService,
-    MailQueueService,
     TokenRevocationService,
   ],
 })

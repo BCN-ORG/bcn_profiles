@@ -2,24 +2,23 @@ import {
   Injectable,
   BadRequestException,
   UnauthorizedException,
-  Logger,
 } from '@nestjs/common';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 import * as bcrypt from 'bcrypt';
-import { randomInt, randomUUID } from 'crypto';
+import { randomInt } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from './email.service';
 import { AuthChallengeService } from './auth-challenge.service';
 import { decryptSecret, encryptSecret } from '../utils/secret-crypto';
+import { EmailOtpPurpose, EmailOtpService } from './email-otp.service';
 
 @Injectable()
 export class TwoFactorAuthService {
-  private readonly logger = new Logger(TwoFactorAuthService.name);
-
   constructor(
     private readonly prismaService: PrismaService,
     private readonly emailService: EmailService,
+    private readonly emailOtp: EmailOtpService,
     private readonly challengeService: AuthChallengeService,
   ) {}
 
@@ -174,68 +173,35 @@ export class TwoFactorAuthService {
     return false;
   }
 
-  async generateAndSendEmailOTP(email: string): Promise<void> {
-    const otp = randomInt(100000, 1000000).toString();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const otpHash = await bcrypt.hash(otp, 10);
-
-    await this.prismaService.passwordReset.create({
-      data: {
-        id: `2fa-email-${randomUUID()}`,
-        email,
-        otp: otpHash,
-        expiresAt,
-        isUsed: false,
-      },
-    });
-
-    void this.emailService.sendTwoFactorOTP(email, otp).catch((error) => {
-      this.logger.error(
-        'Failed to send 2FA OTP email in background',
-        error instanceof Error ? error.stack : undefined,
-      );
-    });
+  async generateAndSendEmailOTP(
+    email: string,
+    purpose: Extract<
+      EmailOtpPurpose,
+      'two-factor-login' | 'two-factor-recovery'
+    > = 'two-factor-login',
+  ): Promise<void> {
+    const otp = await this.emailOtp.issue(purpose, email);
+    try {
+      if (purpose === 'two-factor-recovery') {
+        await this.emailService.sendTwoFactorRecoveryEmail(email, otp);
+      } else {
+        await this.emailService.sendTwoFactorOTP(email, otp);
+      }
+    } catch (error) {
+      await this.emailOtp.revoke(purpose, email);
+      throw error;
+    }
   }
 
-  async verifyEmailOTP(email: string, otp: string): Promise<boolean> {
-    const records = await this.prismaService.passwordReset.findMany({
-      where: {
-        email,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-        id: { startsWith: '2fa-email-' },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
-
-    for (const record of records) {
-      const match = await bcrypt.compare(otp, record.otp);
-      if (!match) continue;
-
-      const updated = await this.prismaService.passwordReset.updateMany({
-        where: { id: record.id, isUsed: false },
-        data: { isUsed: true },
-      });
-      return updated.count === 1;
-    }
-
-    // Backward-compat: older plaintext OTP rows
-    const legacy = await this.prismaService.passwordReset.findFirst({
-      where: {
-        email,
-        otp,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
-    });
-    if (!legacy) return false;
-
-    const updated = await this.prismaService.passwordReset.updateMany({
-      where: { id: legacy.id, isUsed: false },
-      data: { isUsed: true },
-    });
-    return updated.count === 1;
+  verifyEmailOTP(
+    email: string,
+    otp: string,
+    purpose: Extract<
+      EmailOtpPurpose,
+      'two-factor-login' | 'two-factor-recovery'
+    > = 'two-factor-login',
+  ): Promise<boolean> {
+    return this.emailOtp.consume(purpose, email, otp);
   }
 
   async validatePassword(userId: string, password: string): Promise<boolean> {

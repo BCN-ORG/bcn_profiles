@@ -15,7 +15,7 @@ import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailService } from './services/email.service';
-import { randomInt, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { RequestEmailChangeDto } from './dto/request-email-change.dto';
 import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
 import { TwoFactorAuthService } from './services/two-factor-auth.service';
@@ -27,6 +27,7 @@ import { TokenRevocationService } from './services/token-revocation.service';
 import { isTokenRevokedBefore } from './token-issued-at';
 import { IdentitySessionService } from '../identity/session.service';
 import { MembershipService } from '../membership/membership.service';
+import { EmailOtpService } from './services/email-otp.service';
 
 type TokenUser = {
   id: string;
@@ -66,6 +67,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    private readonly emailOtp: EmailOtpService,
     private twoFactorAuthService: TwoFactorAuthService,
     private readonly sessionCache: AuthSessionCacheService,
     private readonly tokenRevocation: TokenRevocationService,
@@ -412,38 +414,22 @@ export class AuthService {
       throw new ConflictException('Email đã được sử dụng bởi tài khoản khác');
     }
 
-    // Xóa OTP cũ chưa dùng (dùng key riêng để phân biệt với forgot-password)
-    await this.prisma.passwordReset.deleteMany({
-      where: { email: `change_email:${userId}:${newEmail}`, isUsed: false },
-    });
-
-    const otp = this.generateOTP();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
-    const otpHash = await bcrypt.hash(otp, 10);
-
-    await this.prisma.passwordReset.create({
-      data: {
-        id: randomUUID(),
-        email: `change_email:${userId}:${newEmail}`,
-        otp: otpHash,
-        expiresAt,
-        isUsed: false,
-      },
-    });
-
-    void this.emailService
-      .sendChangeEmailOtp(newEmail, otp, currentUser.fullName || undefined)
-      .catch((error) => {
-        this.logger.error(
-          'Failed to send change-email OTP in background',
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    const identity = `${userId}:${newEmail}`;
+    const otp = await this.emailOtp.issue('change-email', identity);
+    try {
+      await this.emailService.sendChangeEmailOtp(
+        newEmail,
+        otp,
+        currentUser.fullName || undefined,
+      );
+    } catch (error) {
+      await this.emailOtp.revoke('change-email', identity);
+      throw error;
+    }
 
     return {
-      message: `Mã OTP đang được gửi đến ${newEmail}. Vui lòng kiểm tra hộp thư.`,
-      expiresIn: '15 phút',
+      message: `Mã OTP đã được gửi đến ${newEmail}. Vui lòng kiểm tra hộp thư.`,
+      expiresIn: '5 phút',
     };
   }
 
@@ -453,25 +439,12 @@ export class AuthService {
   async confirmEmailChange(userId: string, dto: ConfirmEmailChangeDto) {
     const { newEmail, otp } = dto;
 
-    const candidates = await this.prisma.passwordReset.findMany({
-      where: {
-        email: `change_email:${userId}:${newEmail}`,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
-
-    let record = null as (typeof candidates)[number] | null;
-    for (const row of candidates) {
-      if (await bcrypt.compare(otp, row.otp)) {
-        record = row;
-        break;
-      }
-    }
-
-    if (!record) {
+    const valid = await this.emailOtp.consume(
+      'change-email',
+      `${userId}:${newEmail}`,
+      otp,
+    );
+    if (!valid) {
       throw new BadRequestException('Mã OTP không hợp lệ hoặc đã được sử dụng');
     }
 
@@ -484,24 +457,14 @@ export class AuthService {
       throw new ConflictException('Email đã được sử dụng bởi tài khoản khác');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: userId },
-        data: { email: newEmail, updatedAt: new Date() },
-      }),
-      this.prisma.passwordReset.update({
-        where: { id: record.id },
-        data: { isUsed: true },
-      }),
-    ]);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { email: newEmail, updatedAt: new Date() },
+    });
 
     await this.sessionCache.invalidateUser(userId);
 
     return { message: 'Cập nhật email thành công.' };
-  }
-
-  private generateOTP(): string {
-    return randomInt(100000, 1000000).toString();
   }
 
   private assertUserActive(status: string): void {
@@ -535,44 +498,27 @@ export class AuthService {
     const genericResponse = {
       message:
         'Nếu email tồn tại trong hệ thống, mã OTP sẽ được gửi đến hộp thư của bạn.',
-      expiresIn: '15 phút',
+      expiresIn: '5 phút',
     };
 
     if (!user) {
       return genericResponse;
     }
 
-    // Xóa các OTP cũ chưa sử dụng của email này
-    await this.prisma.passwordReset.deleteMany({
-      where: {
+    const otp = await this.emailOtp.issue('reset-password', email);
+    try {
+      await this.emailService.sendResetPasswordEmail(
         email,
-        isUsed: false,
-      },
-    });
-
-    const otp = this.generateOTP();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
-    const otpHash = await bcrypt.hash(otp, 10);
-
-    await this.prisma.passwordReset.create({
-      data: {
-        id: randomUUID(),
-        email,
-        otp: otpHash,
-        expiresAt,
-        isUsed: false,
-      },
-    });
-
-    void this.emailService
-      .sendResetPasswordEmail(email, otp, user.fullName || undefined)
-      .catch((error) => {
-        this.logger.error(
-          'Failed to send reset-password OTP in background',
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+        otp,
+        user.fullName || undefined,
+      );
+    } catch (error) {
+      await this.emailOtp.revoke('reset-password', email);
+      this.logger.error(
+        'Failed to send reset-password OTP',
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
 
     return genericResponse;
   }
@@ -583,25 +529,8 @@ export class AuthService {
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
     const { email, otp, newPassword } = resetPasswordDto;
 
-    const candidates = await this.prisma.passwordReset.findMany({
-      where: {
-        email,
-        isUsed: false,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
-
-    let passwordReset = null as (typeof candidates)[number] | null;
-    for (const row of candidates) {
-      if (await bcrypt.compare(otp, row.otp)) {
-        passwordReset = row;
-        break;
-      }
-    }
-
-    if (!passwordReset) {
+    const valid = await this.emailOtp.consume('reset-password', email, otp);
+    if (!valid) {
       throw new BadRequestException('Mã OTP không hợp lệ hoặc đã được sử dụng');
     }
 
@@ -614,14 +543,6 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    const marked = await this.prisma.passwordReset.updateMany({
-      where: { id: passwordReset.id, isUsed: false },
-      data: { isUsed: true },
-    });
-    if (marked.count !== 1) {
-      throw new BadRequestException('Mã OTP không hợp lệ hoặc đã được sử dụng');
-    }
 
     await this.prisma.user.update({
       where: { email },

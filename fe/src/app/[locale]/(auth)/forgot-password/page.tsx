@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/primitives';
 import { authService } from '@/services';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { OtpCountdown } from '@/components/auth/otp-countdown';
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('password');
@@ -19,18 +20,32 @@ export default function ForgotPasswordPage() {
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [otpSentAt, setOtpSentAt] = useState<number | null>(null);
 
   async function requestOtp(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
+    const requestedAt = Date.now();
     try {
       await authService.forgotPassword(email);
       toast.success(t('otpSent'));
+      setOtpSentAt(requestedAt);
       setStep('reset');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tc('error'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function resendOtp() {
+    const requestedAt = Date.now();
+    try {
+      await authService.forgotPassword(email);
+      setOtpSentAt(requestedAt);
+      toast.success(t('otpSent'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : tc('error'));
     }
   }
 
@@ -72,13 +87,21 @@ export default function ForgotPasswordPage() {
       ) : (
         <form className="flex flex-col gap-5" onSubmit={reset}>
           <div className="space-y-2">
-            <Label>{t('otp')}</Label>
+            <Label htmlFor="reset-password-otp">{t('otp')}</Label>
             <Input
+              id="reset-password-otp"
               required
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              pattern="[0-9]{6}"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
+              onChange={(e) =>
+                setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+              }
             />
           </div>
+          <OtpCountdown sentAt={otpSentAt} onResend={resendOtp} />
           <div className="space-y-2">
             <Label>{t('newPassword')}</Label>
             <Input

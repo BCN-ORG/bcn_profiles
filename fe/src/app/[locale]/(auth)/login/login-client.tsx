@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SocialIcon } from '@/components/auth/social-icons';
+import { OtpCountdown } from '@/components/auth/otp-countdown';
 import { oauthAppName } from '@/lib/oauth-app-name';
 import {
   clearOauthHandoff,
@@ -78,11 +79,17 @@ export default function LoginPage() {
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState('');
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [emailOtpSentAt, setEmailOtpSentAt] = useState<number | null>(null);
+  const [emailOtpBusy, setEmailOtpBusy] = useState(false);
 
   function setStep(nextStep: AuthStep) {
     setStepState(nextStep);
-    if (nextStep.kind === 'login') clearAuthStep();
-    else writeAuthStep(nextStep);
+    if (nextStep.kind === 'login') {
+      clearAuthStep();
+      setEmailOtpSentAt(null);
+    } else {
+      writeAuthStep(nextStep);
+    }
   }
 
   function leaveToOauth(url: string) {
@@ -223,6 +230,7 @@ export default function LoginPage() {
           result.requiresTwoFactorVerification &&
           result.verificationToken
         ) {
+          setEmailOtpSentAt(null);
           setStep({
             kind: 'verify',
             token: result.verificationToken,
@@ -255,6 +263,21 @@ export default function LoginPage() {
       setError(reason instanceof Error ? reason.message : tc('error'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function sendLoginEmailOtp() {
+    if (step.kind !== 'verify') return;
+    setEmailOtpBusy(true);
+    const requestedAt = Date.now();
+    try {
+      await authService.sendEmailOtp(step.token);
+      setEmailOtpSentAt(requestedAt);
+      toast.success(t('emailOtpSent'));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : tc('error'));
+    } finally {
+      setEmailOtpBusy(false);
     }
   }
 
@@ -376,27 +399,40 @@ export default function LoginPage() {
               </TabsList>
             </Tabs>
             {step.method === 'email' ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() =>
-                  void authService
-                    .sendEmailOtp(step.token)
-                    .then(() => toast.success('OTP sent'))
-                    .catch((e) => toast.error(e.message))
-                }
-              >
-                {t('sendEmailOtp')}
-              </Button>
+              emailOtpSentAt ? (
+                <OtpCountdown
+                  sentAt={emailOtpSentAt}
+                  onResend={sendLoginEmailOtp}
+                />
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 w-full"
+                  disabled={emailOtpBusy}
+                  onClick={() => void sendLoginEmailOtp()}
+                >
+                  {emailOtpBusy ? tc('loading') : t('sendEmailOtp')}
+                </Button>
+              )
             ) : null}
             <div className="space-y-2">
-              <Label>{t('code')}</Label>
+              <Label htmlFor="login-verification-code">{t('code')}</Label>
               <Input
-                inputMode="numeric"
-                autoComplete="one-time-code"
+                id="login-verification-code"
+                inputMode={step.method === 'backup-code' ? 'text' : 'numeric'}
+                autoComplete={
+                  step.method === 'backup-code' ? 'off' : 'one-time-code'
+                }
+                maxLength={step.method === 'backup-code' ? 8 : 6}
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) =>
+                  setCode(
+                    step.method === 'backup-code'
+                      ? e.target.value.toUpperCase().slice(0, 8)
+                      : e.target.value.replace(/\D/g, '').slice(0, 6),
+                  )
+                }
                 required
               />
             </div>
