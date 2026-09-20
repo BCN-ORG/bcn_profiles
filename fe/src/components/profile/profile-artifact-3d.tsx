@@ -23,7 +23,7 @@ type Props = {
   hint?: string;
 };
 
-const DEFAULT_ROTATION = { x: -0.08, y: -0.22, z: 0 };
+const DEFAULT_ROTATION = { x: -0.06, y: -0.18, z: 0 };
 
 function ArtifactFallback({
   initials,
@@ -33,8 +33,8 @@ function ArtifactFallback({
   label: string;
 }) {
   return (
-    <div className="flex aspect-square min-h-72 items-center justify-center rounded-xl bg-muted/40">
-      <div className="flex size-32 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-3xl font-semibold text-primary shadow-card">
+    <div className="flex aspect-square min-h-72 items-center justify-center rounded-[calc(var(--radius)+2px)] border border-border/80 bg-muted/40">
+      <div className="flex size-32 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-3xl font-semibold tracking-tight text-primary shadow-card">
         {initials}
       </div>
       <span className="sr-only">{label}</span>
@@ -115,7 +115,7 @@ export default function ProfileArtifact3D({
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-      camera.position.set(0, 0.15, 5.4);
+      camera.position.set(0, 0, 4.6);
 
       try {
         createArtifactSceneLights(scene);
@@ -230,7 +230,7 @@ export default function ProfileArtifact3D({
     <div className="space-y-3">
       <div
         ref={containerRef}
-        className="aspect-square min-h-72 overflow-hidden rounded-xl bg-muted/30"
+        className="aspect-square min-h-72 overflow-hidden rounded-[calc(var(--radius)+2px)] border border-border/70 bg-[radial-gradient(circle_at_50%_42%,oklch(0.22_0.02_160_/_0.35),transparent_62%),var(--muted)]/40 shadow-[inset_0_1px_0_oklch(1_0_0_/_0.04)] dark:bg-[radial-gradient(circle_at_50%_42%,oklch(0.45_0.08_160_/_0.18),transparent_62%),oklch(0_0_0_/_0.25)]"
       >
         <canvas
           ref={canvasRef}

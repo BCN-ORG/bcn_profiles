@@ -184,6 +184,41 @@
     background-size: 24px 24px;
   }
 
+  /* Public profile: quiet zinc grain + soft emerald wash — product, not marketing */
+  .profile-canvas {
+    background-image:
+      radial-gradient(
+        ellipse 80% 50% at 10% -10%,
+        oklch(0.55 0.14 160 / 6%),
+        transparent 55%
+      ),
+      radial-gradient(
+        circle at 1px 1px,
+        oklch(0.5 0.02 260 / 5%) 1px,
+        transparent 0
+      );
+    background-size:
+      auto,
+      28px 28px;
+  }
+
+  .dark .profile-canvas {
+    background-image:
+      radial-gradient(
+        ellipse 70% 45% at 8% -8%,
+        oklch(0.68 0.14 160 / 9%),
+        transparent 55%
+      ),
+      radial-gradient(
+        circle at 1px 1px,
+        oklch(1 0 0 / 3.5%) 1px,
+        transparent 0
+      );
+    background-size:
+      auto,
+      28px 28px;
+  }
+
   .auth-panel {
     background: var(--card);
     border: 1px solid var(--border);

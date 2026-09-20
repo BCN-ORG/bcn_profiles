@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   AppWindow,
@@ -11,15 +11,16 @@ import {
   Link2,
   LogOut,
   MonitorSmartphone,
+  Moon,
   ScrollText,
   Shield,
+  Sun,
   User,
   Users,
 } from 'lucide-react';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
-import { LocaleSwitcher, useAuth } from '@/components/auth/auth-provider';
-import { ThemeToggle } from '@/components/theme/theme-provider';
-import { Button } from '@/components/ui/primitives';
+import { useAuth } from '@/components/auth/auth-provider';
+import { useTheme } from '@/components/theme/theme-provider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Sidebar,
@@ -41,6 +42,8 @@ import { isAdmin } from '@/lib/onboarding';
 import { useQuery } from '@tanstack/react-query';
 import { rbacService } from '@/services';
 import type { LucideIcon } from 'lucide-react';
+import { useTransition } from 'react';
+import { setClientLocale, type StoredLocale } from '@/i18n/locale';
 
 type NavItem = { href: string; key: string; icon: LucideIcon };
 
@@ -67,12 +70,6 @@ const adminLinks: NavItem[] = [
 function navActive(pathname: string, href: string) {
   if (href === '/') return pathname === '/';
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function currentTitle(pathname: string, t: (key: string) => string): string {
-  const all = [...mainLinks, ...securityLinks, ...adminLinks];
-  const match = all.find((item) => navActive(pathname, item.href));
-  return match ? t(match.key) : t('overview');
 }
 
 function NavGroup({
@@ -119,7 +116,7 @@ function NavGroup({
                     ) : null}
                     <Icon
                       className={cn(
-                        'size-4 shrink-0 transition-colors',
+                        'size-4 shrink-0 transition-colors group-data-[collapsible=icon]:size-5',
                         active ? 'text-primary' : 'text-muted-foreground',
                       )}
                       aria-hidden
@@ -136,13 +133,133 @@ function NavGroup({
   );
 }
 
+function AccountUserMenu({
+  name,
+  email,
+  avatar,
+  onLogout,
+}: {
+  name: string;
+  email: string;
+  avatar?: string | null;
+  onLogout: () => void;
+}) {
+  const tc = useTranslations('common');
+  const { resolvedTheme, setTheme } = useTheme();
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [pending, startTransition] = useTransition();
+  const isDark = resolvedTheme === 'dark';
+
+  function switchLocale(next: StoredLocale) {
+    if (next === locale || pending) return;
+    setClientLocale(next);
+    document.documentElement.lang = next;
+    startTransition(() => {
+      router.replace(
+        `${pathname}${typeof window !== 'undefined' ? window.location.search : ''}`,
+        { locale: next },
+      );
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        className="flex size-11 cursor-pointer items-center justify-center rounded-xl outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+        aria-haspopup="menu"
+        aria-label={name}
+      >
+        <Avatar size="lg" className="size-11 rounded-xl after:rounded-xl">
+          {avatar ? (
+            <AvatarImage src={avatar} alt="" className="rounded-xl" />
+          ) : null}
+          <AvatarFallback className="rounded-xl bg-primary/12 text-sm font-semibold text-primary">
+            {initials(name)}
+          </AvatarFallback>
+        </Avatar>
+      </button>
+
+      <div
+        role="menu"
+        className={cn(
+          'invisible absolute top-full right-0 z-50 w-56 pt-2 opacity-0 transition-[opacity,visibility] duration-150 ease-premium',
+          'pointer-events-none group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100',
+          'group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100',
+        )}
+      >
+        <div className="overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-card ring-1 ring-foreground/5">
+          <div className="border-b border-border px-3 py-2.5">
+            <p className="truncate text-sm font-medium">{name}</p>
+            <p className="truncate text-xs text-muted-foreground">{email}</p>
+          </div>
+
+          <div className="p-1.5">
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            >
+              {isDark ? (
+                <Sun className="size-4 text-primary" aria-hidden />
+              ) : (
+                <Moon className="size-4 text-primary" aria-hidden />
+              )}
+              {isDark ? tc('themeLight') : tc('themeDark')}
+            </button>
+
+            <div className="mt-1 rounded-lg px-2.5 py-2">
+              <p className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                {tc('language')}
+              </p>
+              <div className="flex gap-1">
+                {(['vi', 'en'] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    disabled={pending}
+                    className={cn(
+                      'h-7 flex-1 cursor-pointer rounded-full text-[11px] font-semibold tracking-wide transition-colors',
+                      locale === item
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    )}
+                    onClick={() => switchLocale(item)}
+                  >
+                    {item.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-border p-1.5">
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
+              onClick={onLogout}
+            >
+              <LogOut className="size-4" aria-hidden />
+              {tc('logout')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AccountShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations('nav');
   const tc = useTranslations('common');
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const pageTitle = currentTitle(pathname, t);
   const managedApps = useQuery({
     queryKey: ['admin', 'rbac', 'apps'],
     queryFn: () => rbacService.listApps(),
@@ -160,6 +277,8 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const displayName = user.fullName || 'BCN Member';
+
   return (
     <SidebarProvider>
       <a
@@ -172,14 +291,19 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
         collapsible="icon"
         className="border-r border-sidebar-border bg-sidebar"
       >
-        <SidebarHeader className="gap-0 border-b border-sidebar-border px-3 py-4">
+        <SidebarHeader className="h-16 justify-center gap-0 overflow-visible border-b border-sidebar-border px-3 py-0 group-data-[collapsible=icon]:px-1.5">
           <Link
             href="/"
-            className="flex items-center gap-3 rounded-lg px-1 py-0.5 outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-full items-center gap-3 rounded-lg px-1 outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
           >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground shadow-sm">
-              <span className="text-sm tracking-tight">B</span>
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/bcn-card-back.webp"
+              alt="BCN"
+              width={40}
+              height={40}
+              className="size-10 shrink-0 rounded-lg object-cover ring-1 ring-border/80"
+            />
             <div className="min-w-0 leading-tight group-data-[collapsible=icon]:hidden">
               <strong className="block truncate text-sm font-semibold tracking-tight">
                 BCN Account
@@ -216,11 +340,11 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-sidebar-border p-3">
-          <div className="flex items-center gap-2.5 rounded-lg p-1.5 transition-colors group-data-[collapsible=icon]:justify-center">
+        <SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:p-2">
+          <div className="flex items-center gap-2.5 rounded-lg p-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0">
             <Avatar
               size="sm"
-              className="size-9 shrink-0 rounded-lg after:rounded-lg"
+              className="size-9 shrink-0 rounded-lg after:rounded-lg group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:after:rounded-xl"
             >
               {user.avatar ? (
                 <AvatarImage src={user.avatar} alt="" className="rounded-lg" />
@@ -231,48 +355,26 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
             </Avatar>
             <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
               <strong className="block truncate text-sm font-medium">
-                {user.fullName || 'BCN Member'}
+                {displayName}
               </strong>
               <small className="block truncate text-[11px] text-muted-foreground">
                 {user.email}
               </small>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 shrink-0 rounded-lg text-muted-foreground group-data-[collapsible=icon]:hidden"
-              onClick={() => void logout()}
-              aria-label={tc('logout')}
-              title={tc('logout')}
-            >
-              <LogOut className="size-4" aria-hidden />
-            </Button>
           </div>
         </SidebarFooter>
       </Sidebar>
 
       <SidebarInset id="main-content" className="min-h-svh bg-background">
         <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-md">
-          <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 md:px-8 lg:px-10">
+          <div className="flex h-16 w-full items-center justify-between gap-3 px-4 md:px-6 lg:px-8">
             <SidebarTrigger className="size-9 rounded-lg" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold tracking-tight">
-                {pageTitle}
-              </p>
-            </div>
-            <div className="flex items-center gap-1">
-              <ThemeToggle />
-              <LocaleSwitcher />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hidden h-8 px-3 sm:inline-flex"
-                onClick={() => void logout()}
-              >
-                <LogOut className="size-3.5" aria-hidden />
-                {tc('logout')}
-              </Button>
-            </div>
+            <AccountUserMenu
+              name={displayName}
+              email={user.email}
+              avatar={user.avatar}
+              onLogout={() => void logout()}
+            />
           </div>
         </header>
         <div className="relative mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-8 md:py-8 lg:px-10 lg:py-10">

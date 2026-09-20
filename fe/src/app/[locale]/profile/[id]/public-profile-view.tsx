@@ -26,7 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Link } from "@/i18n/navigation";
-import { initials } from "@/lib/utils";
+import { cn, initials } from "@/lib/utils";
 import { profileService, TIMELINE_EVENT_TYPES } from "@/services";
 
 const ProfileArtifact3D = dynamic(
@@ -34,7 +34,7 @@ const ProfileArtifact3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <Skeleton className="aspect-square min-h-72 w-full rounded-xl" />
+      <Skeleton className="aspect-square min-h-72 w-full rounded-[calc(var(--radius)+2px)]" />
     ),
   },
 );
@@ -73,6 +73,7 @@ export default function PublicProfileView() {
     [query.data?.timelineEvents],
   );
   const activeAchievements = new Set(achievementTypes);
+  const earnedCount = achievementTypes.length;
 
   if (query.isLoading) return <ProfileLoading />;
 
@@ -80,9 +81,11 @@ export default function PublicProfileView() {
     return (
       <PublicShell>
         <main className="mx-auto flex min-h-[70dvh] w-full max-w-xl items-center px-4 py-12 md:px-8">
-          <Card className="w-full text-center">
+          <Card className="w-full animate-enter text-center shadow-card">
             <CardHeader>
-              <CardTitle className="text-xl">{t("notFoundTitle")}</CardTitle>
+              <CardTitle className="text-xl tracking-tight">
+                {t("notFoundTitle")}
+              </CardTitle>
               <CardDescription>{t("notFoundDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -110,10 +113,20 @@ export default function PublicProfileView() {
 
   return (
     <PublicShell>
-      <main className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-8 md:py-12">
-        <section className="grid overflow-hidden rounded-xl border border-border bg-card shadow-card lg:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)]">
-          <div className="flex flex-col justify-center p-6 md:p-10 lg:p-12">
-            <div className="flex flex-wrap items-center gap-2">
+      <main className="profile-canvas mx-auto w-full max-w-6xl space-y-10 px-4 py-8 md:space-y-12 md:px-8 md:py-12">
+        <section
+          className={cn(
+            "animate-enter grid overflow-hidden rounded-[calc(var(--radius)+4px)]",
+            "border border-border bg-card shadow-card",
+            "lg:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]",
+          )}
+        >
+          <div className="relative flex flex-col justify-center p-7 md:p-10 lg:p-12">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(ellipse_at_top_left,oklch(0.55_0.14_160_/_0.08),transparent_65%)] dark:bg-[radial-gradient(ellipse_at_top_left,oklch(0.68_0.14_160_/_0.12),transparent_65%)]"
+              aria-hidden
+            />
+            <div className="relative flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="gap-1.5">
                 <ShieldCheck className="size-3.5 text-primary" aria-hidden />
                 {t("verifiedProfile")}
@@ -126,16 +139,16 @@ export default function PublicProfileView() {
               ) : null}
             </div>
 
-            <h1 className="mt-7 text-3xl font-semibold tracking-[-0.035em] text-balance md:text-4xl">
+            <h1 className="relative mt-6 text-[2rem] font-semibold tracking-[-0.04em] text-balance md:mt-8 md:text-4xl lg:text-[2.75rem] lg:leading-[1.1]">
               {name}
             </h1>
 
-            <p className="mt-6 max-w-[58ch] text-base leading-7 text-muted-foreground">
+            <p className="relative mt-5 max-w-[52ch] text-[0.975rem] leading-7 text-muted-foreground md:text-base md:leading-7">
               {profile.bio || t("bioFallback")}
             </p>
 
-            <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm">
-              <span className="inline-flex items-center gap-2 text-muted-foreground">
+            <div className="relative mt-8 flex flex-wrap items-center gap-x-1 gap-y-2 text-sm">
+              <span className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2.5 text-muted-foreground">
                 <CalendarDays className="size-4 text-primary" aria-hidden />
                 {t("joined", { date: joinedAt })}
               </span>
@@ -145,77 +158,103 @@ export default function PublicProfileView() {
                   href={url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex min-h-11 items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 font-medium text-foreground transition-[color,background-color] duration-200 ease-premium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <Link2 className="size-4" aria-hidden />
+                  <Link2 className="size-4 text-primary" aria-hidden />
                   {SOCIAL_LABELS[network]}
-                  <ExternalLink className="size-3.5" aria-hidden />
+                  <ExternalLink className="size-3.5 opacity-60" aria-hidden />
                 </a>
               ))}
             </div>
           </div>
 
-          <div className="border-t border-border bg-muted/20 p-5 lg:border-t-0 lg:border-l">
-            {profile.profile3dEnabled ? (
-              <ProfileArtifact3D
-                initials={profileInitials}
-                avatarUrl={profile.avatar}
-                label={t("artifactLabel", { name })}
-                rotateLeftLabel={t("rotateLeft")}
-                rotateRightLabel={t("rotateRight")}
-                resetLabel={t("resetArtifact")}
-                fallbackLabel={t("artifactFallback")}
-                hint={t("artifactHint")}
-              />
-            ) : (
-              <div className="flex aspect-square min-h-72 items-center justify-center rounded-xl bg-muted/40">
-                <div className="flex size-32 items-center justify-center rounded-full border border-primary/25 bg-primary/10 text-3xl font-semibold text-primary shadow-card">
-                  {profileInitials}
+          <div className="relative border-t border-border bg-muted/25 p-4 sm:p-5 lg:border-t-0 lg:border-l">
+            <div
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,oklch(0.55_0.14_160_/_0.07),transparent_58%)] dark:bg-[radial-gradient(circle_at_50%_40%,oklch(0.68_0.14_160_/_0.1),transparent_58%)]"
+              aria-hidden
+            />
+            <div className="relative">
+              {profile.profile3dEnabled ? (
+                <ProfileArtifact3D
+                  initials={profileInitials}
+                  avatarUrl={profile.avatar}
+                  label={t("artifactLabel", { name })}
+                  rotateLeftLabel={t("rotateLeft")}
+                  rotateRightLabel={t("rotateRight")}
+                  resetLabel={t("resetArtifact")}
+                  fallbackLabel={t("artifactFallback")}
+                  hint={t("artifactHint")}
+                />
+              ) : (
+                <div className="flex aspect-square min-h-72 items-center justify-center rounded-[calc(var(--radius)+2px)] border border-border/80 bg-background/60">
+                  <div className="flex size-32 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-3xl font-semibold tracking-tight text-primary shadow-card">
+                    {profileInitials}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </section>
 
-        <section aria-labelledby="achievements-title">
-          <div className="mb-4 flex items-center gap-3">
-            <BadgeCheck className="size-5 text-primary" aria-hidden />
-            <div>
-              <h2
-                id="achievements-title"
-                className="text-xl font-semibold tracking-tight"
-              >
-                {t("achievementsTitle")}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t("achievementsHint")}
-              </p>
+        <section
+          className="animate-enter animate-enter-delay-1"
+          aria-labelledby="achievements-title"
+        >
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <BadgeCheck className="size-4" aria-hidden />
+              </span>
+              <div>
+                <h2
+                  id="achievements-title"
+                  className="text-lg font-semibold tracking-tight md:text-xl"
+                >
+                  {t("achievementsTitle")}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("achievementsHint")}
+                </p>
+              </div>
             </div>
+            <p className="text-xs font-medium tracking-wide text-muted-foreground tabular-nums">
+              {earnedCount}/{TIMELINE_EVENT_TYPES.length}
+            </p>
           </div>
-          <div className="grid overflow-hidden rounded-xl border border-border bg-card sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid overflow-hidden rounded-[calc(var(--radius)+2px)] border border-border bg-card sm:grid-cols-2 lg:grid-cols-5">
             {TIMELINE_EVENT_TYPES.map((type) => {
               const active = activeAchievements.has(type);
               return (
                 <div
                   key={type}
-                  className="flex min-h-24 items-center gap-3 border-b border-border p-4 last:border-b-0 sm:border-r sm:[&:nth-child(even)]:border-r-0 lg:border-b-0 lg:[&:nth-child(even)]:border-r lg:last:border-r-0"
+                  className={cn(
+                    "flex min-h-[5.5rem] items-center gap-3 border-b border-border p-4 transition-colors duration-200 ease-premium",
+                    "last:border-b-0 sm:border-r sm:[&:nth-child(even)]:border-r-0",
+                    "lg:border-b-0 lg:[&:nth-child(even)]:border-r lg:last:border-r-0",
+                    active && "bg-primary/[0.04] dark:bg-primary/[0.07]",
+                  )}
                 >
                   {active ? (
-                    <BadgeCheck
-                      className="size-5 shrink-0 text-primary"
-                      aria-hidden
-                    />
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      <BadgeCheck className="size-4" aria-hidden />
+                    </span>
                   ) : (
-                    <Circle
-                      className="size-5 shrink-0 text-muted-foreground/50"
-                      aria-hidden
-                    />
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground/55">
+                      <Circle className="size-3.5" aria-hidden />
+                    </span>
                   )}
-                  <div>
-                    <p className="text-sm font-medium">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-snug">
                       {timelineT(`events.${type}`)}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p
+                      className={cn(
+                        "mt-1 text-xs",
+                        active
+                          ? "font-medium text-primary"
+                          : "text-muted-foreground",
+                      )}
+                    >
                       {active
                         ? t("achievementEarned")
                         : t("achievementPending")}
@@ -227,31 +266,43 @@ export default function PublicProfileView() {
           </div>
         </section>
 
-        <section aria-labelledby="timeline-title">
-          <Card>
-            <CardHeader className="border-b border-border pb-5">
-              <CardTitle
-                id="timeline-title"
-                className="flex items-center gap-2"
-              >
-                <History className="size-4 text-primary" aria-hidden />
-                {t("timelineTitle")}
-              </CardTitle>
-              <CardDescription>{t("timelineHint")}</CardDescription>
-            </CardHeader>
-            <CardContent>
+        <section
+          className="animate-enter animate-enter-delay-2"
+          aria-labelledby="timeline-title"
+        >
+          <div className="overflow-hidden rounded-[calc(var(--radius)+2px)] border border-border bg-card shadow-card">
+            <div className="flex items-start gap-3 border-b border-border px-5 py-5 md:px-6">
+              <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <History className="size-4" aria-hidden />
+              </span>
+              <div>
+                <h2
+                  id="timeline-title"
+                  className="text-lg font-semibold tracking-tight md:text-xl"
+                >
+                  {t("timelineTitle")}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("timelineHint")}
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-5 md:px-6 md:py-6">
               {profile.timelineEvents.length ? (
-                <ol className="grid gap-5 md:grid-cols-2">
+                <ol className="grid gap-4 md:grid-cols-2 md:gap-5">
                   {profile.timelineEvents.slice(0, 8).map((event) => (
-                    <li key={event.id} className="flex gap-3">
-                      <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <li
+                      key={event.id}
+                      className="group flex gap-3 rounded-xl border border-transparent p-3 transition-[border-color,background-color] duration-200 ease-premium hover:border-border hover:bg-muted/40"
+                    >
+                      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors duration-200 ease-premium group-hover:bg-primary/15">
                         <BadgeCheck className="size-4" aria-hidden />
                       </span>
                       <div className="min-w-0">
-                        <p className="font-medium [overflow-wrap:anywhere]">
+                        <p className="font-medium leading-snug [overflow-wrap:anywhere]">
                           {event.title}
                         </p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
                           {timelineT(`events.${event.eventType}`)}
                           {" · "}
                           {new Intl.DateTimeFormat(locale, {
@@ -268,8 +319,8 @@ export default function PublicProfileView() {
                   description={t("timelineEmptyHint")}
                 />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </section>
       </main>
     </PublicShell>
@@ -280,23 +331,29 @@ function PublicShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations("publicProfile");
   return (
     <div className="min-h-[100dvh] bg-background">
-      <header className="border-b border-border bg-background/95">
+      <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 md:px-8">
           <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-sm font-bold tracking-tight text-primary-foreground shadow-[0_0_0_1px_oklch(0.55_0.14_160_/_0.25)]">
               B
             </span>
             <div className="leading-tight">
-              <strong className="block text-sm tracking-tight">BCN</strong>
-              <span className="text-[11px] text-muted-foreground">
+              <strong className="block text-[0.95rem] font-semibold tracking-[-0.02em]">
+                BCN
+              </strong>
+              <span className="text-[11px] tracking-wide text-muted-foreground">
                 {t("headerLabel")}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             <ThemeToggle />
             <LocaleSwitcher />
-            <Button asChild variant="ghost" className="ml-1">
+            <Button
+              asChild
+              variant="ghost"
+              className="ml-1 cursor-pointer font-medium"
+            >
               <Link href="/">{t("account")}</Link>
             </Button>
           </div>
@@ -311,12 +368,12 @@ function ProfileLoading() {
   return (
     <PublicShell>
       <main
-        className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-8 md:py-12"
+        className="profile-canvas mx-auto w-full max-w-6xl space-y-10 px-4 py-8 md:space-y-12 md:px-8 md:py-12"
         aria-busy="true"
       >
-        <Skeleton className="h-[32rem] w-full rounded-xl" />
-        <Skeleton className="h-36 w-full rounded-xl" />
-        <Skeleton className="h-72 w-full rounded-xl" />
+        <Skeleton className="h-[28rem] w-full rounded-[calc(var(--radius)+4px)] md:h-[32rem]" />
+        <Skeleton className="h-40 w-full rounded-[calc(var(--radius)+2px)]" />
+        <Skeleton className="h-64 w-full rounded-[calc(var(--radius)+2px)]" />
       </main>
     </PublicShell>
   );
