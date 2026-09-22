@@ -61,7 +61,7 @@ describe('OauthService', () => {
       }),
     };
     service = new OauthService(
-      prisma as any,
+      prisma,
       redis as any,
       sessions,
       authorization,

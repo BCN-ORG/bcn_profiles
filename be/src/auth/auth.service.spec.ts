@@ -15,16 +15,36 @@ import { MembershipService } from '../membership/membership.service';
 describe('AuthService', () => {
   let service: AuthService;
   let module: TestingModule;
+  let prisma: {
+    user: { findUnique: jest.Mock; update: jest.Mock };
+  };
+  let cache: {
+    setUser: jest.Mock;
+    getRevokedBefore: jest.Mock;
+    invalidateUser: jest.Mock;
+    setRevokedBefore: jest.Mock;
+  };
+  let sessions: { revokeOtherUserSessions: jest.Mock };
+  let membership: { assertEligible: jest.Mock };
 
   beforeEach(async () => {
+    prisma = {
+      user: { findUnique: jest.fn(), update: jest.fn() },
+    };
+    cache = {
+      setUser: jest.fn(),
+      getRevokedBefore: jest.fn(),
+      invalidateUser: jest.fn(),
+      setRevokedBefore: jest.fn(),
+    };
+    sessions = { revokeOtherUserSessions: jest.fn() };
+    membership = { assertEligible: jest.fn() };
     module = await Test.createTestingModule({
       providers: [
         AuthService,
         {
           provide: PrismaService,
-          useValue: {
-            user: { findUnique: jest.fn(), update: jest.fn() },
-          },
+          useValue: prisma,
         },
         {
           provide: JwtService,
@@ -39,12 +59,7 @@ describe('AuthService', () => {
         { provide: TwoFactorAuthService, useValue: {} },
         {
           provide: AuthSessionCacheService,
-          useValue: {
-            setUser: jest.fn(),
-            getRevokedBefore: jest.fn(),
-            invalidateUser: jest.fn(),
-            setRevokedBefore: jest.fn(),
-          },
+          useValue: cache,
         },
         {
           provide: TokenRevocationService,
@@ -55,11 +70,11 @@ describe('AuthService', () => {
         },
         {
           provide: IdentitySessionService,
-          useValue: { revokeOtherUserSessions: jest.fn() },
+          useValue: sessions,
         },
         {
           provide: MembershipService,
-          useValue: { assertEligible: jest.fn() },
+          useValue: membership,
         },
       ],
     }).compile();
@@ -74,9 +89,7 @@ describe('AuthService', () => {
       avatar: null,
     };
     const jwt = module.get<JwtService>(JwtService);
-    const prisma = module.get<PrismaService>(PrismaService);
-    const cache = module.get<AuthSessionCacheService>(AuthSessionCacheService);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue(user);
+    prisma.user.findUnique.mockResolvedValue(user);
     (jwt.sign as jest.Mock).mockImplementation((payload) =>
       JSON.stringify(payload),
     );
@@ -87,7 +100,7 @@ describe('AuthService', () => {
       iat: 1800000000,
       issuedAtMs: 1800000000600,
     });
-    (cache.getRevokedBefore as jest.Mock).mockResolvedValue(1800000000500);
+    cache.getRevokedBefore.mockResolvedValue(1800000000500);
   });
 
   it('should be defined', () => {
@@ -106,9 +119,7 @@ describe('AuthService', () => {
   });
 
   it('changes a default password and clears the required-change flag', async () => {
-    const prisma = module.get<PrismaService>(PrismaService);
-    const cache = module.get<AuthSessionCacheService>(AuthSessionCacheService);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+    prisma.user.findUnique.mockResolvedValue({
       password: await bcrypt.hash('111111', 4),
       metadata: { mustChangePassword: true, cohort: 'K20' },
     });
@@ -127,18 +138,16 @@ describe('AuthService', () => {
       'u1',
       expect.any(Number),
     );
-    const revokedBefore = (cache.setRevokedBefore as jest.Mock).mock
-      .calls[0][1];
+    const revokedBefore = cache.setRevokedBefore.mock.calls[0][1];
     expect(JSON.parse(result.access_token).issuedAtMs).toBe(revokedBefore + 1);
-    expect(
-      module.get<IdentitySessionService>(IdentitySessionService)
-        .revokeOtherUserSessions,
-    ).toHaveBeenCalledWith('u1', undefined);
+    expect(sessions.revokeOtherUserSessions).toHaveBeenCalledWith(
+      'u1',
+      undefined,
+    );
   });
 
   it('marks an existing account when it logs in with the default password', async () => {
-    const prisma = module.get<PrismaService>(PrismaService);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+    prisma.user.findUnique.mockResolvedValue({
       id: 'u1',
       email: 'test@example.invalid',
       password: await bcrypt.hash('111111', 4),
@@ -161,9 +170,7 @@ describe('AuthService', () => {
   });
 
   it('completes onboarding only after a fresh membership check', async () => {
-    const prisma = module.get<PrismaService>(PrismaService);
-    const membership = module.get<MembershipService>(MembershipService);
-    (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+    prisma.user.findUnique.mockResolvedValue({
       metadata: { mustChangePassword: false, cohort: 'K20' },
     });
 
