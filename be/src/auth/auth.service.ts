@@ -29,6 +29,9 @@ import { IdentitySessionService } from '../identity/session.service';
 import { MembershipService } from '../membership/membership.service';
 import { EmailOtpService } from './services/email-otp.service';
 
+const DEFAULT_PASSWORD = '111111';
+const ONBOARDING_VERSION = 1;
+
 type TokenUser = {
   id: string;
   email: string;
@@ -96,6 +99,7 @@ export class AuthService {
         status: true,
         twoFactorEnabled: true,
         twoFactorRequired: true,
+        metadata: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -119,6 +123,23 @@ export class AuthService {
       throw new UnauthorizedException(
         'Tài khoản đã bị khóa. Vui lòng liên hệ admin.',
       );
+    }
+
+    const metadata =
+      user.metadata &&
+      typeof user.metadata === 'object' &&
+      !Array.isArray(user.metadata)
+        ? user.metadata
+        : {};
+    if (
+      password === DEFAULT_PASSWORD &&
+      (metadata as Record<string, unknown>).mustChangePassword !== true
+    ) {
+      user.metadata = { ...metadata, mustChangePassword: true };
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { metadata: user.metadata },
+      });
     }
 
     const { password: passwordHash, ...result } = user;
@@ -548,12 +569,23 @@ export class AuthService {
       where: { email },
       data: {
         password: hashedPassword,
+        metadata: {
+          ...(user.metadata &&
+          typeof user.metadata === 'object' &&
+          !Array.isArray(user.metadata)
+            ? user.metadata
+            : {}),
+          mustChangePassword: false,
+        },
         updatedAt: new Date(),
       },
     });
 
-    await this.sessionCache.setRevokedBefore(user.id);
-    await this.sessionCache.invalidateUser(user.id);
+    await Promise.all([
+      this.sessionCache.setRevokedBefore(user.id),
+      this.sessionCache.invalidateUser(user.id),
+      this.identitySessions?.revokeAllUserSessions(user.id),
+    ]);
 
     return {
       message:
@@ -561,11 +593,109 @@ export class AuthService {
     };
   }
 
-  private async issueTokenPair(user: TokenUser): Promise<{
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    currentSsoSid?: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        fullName: true,
+        avatar: true,
+        role: true,
+        status: true,
+        metadata: true,
+        createdAt: true,
+        updatedAt: true,
+        twoFactorEnabled: true,
+      },
+    });
+    if (
+      !user?.password ||
+      !(await bcrypt.compare(currentPassword, user.password))
+    ) {
+      throw new BadRequestException('Mật khẩu hiện tại không đúng');
+    }
+    if (await bcrypt.compare(newPassword, user.password)) {
+      throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại');
+    }
+
+    const metadata =
+      user.metadata &&
+      typeof user.metadata === 'object' &&
+      !Array.isArray(user.metadata)
+        ? user.metadata
+        : {};
+    const updatedAt = new Date();
+    const updatedMetadata = { ...metadata, mustChangePassword: false };
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: await bcrypt.hash(newPassword, 10),
+        metadata: updatedMetadata,
+        updatedAt,
+      },
+    });
+    const revokedBefore = Date.now();
+    await Promise.all([
+      this.sessionCache.setRevokedBefore(userId, revokedBefore),
+      this.sessionCache.invalidateUser(userId),
+      this.identitySessions?.revokeOtherUserSessions(userId, currentSsoSid),
+    ]);
+    return {
+      message: 'Đổi mật khẩu thành công',
+      ...(await this.issueTokenPair(
+        {
+          ...user,
+          metadata: updatedMetadata,
+          updatedAt,
+        },
+        revokedBefore + 1,
+      )),
+    };
+  }
+
+  async completeOnboarding(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { metadata: true },
+    });
+    if (!user) throw new NotFoundException('Người dùng không tồn tại');
+
+    const metadata =
+      user.metadata &&
+      typeof user.metadata === 'object' &&
+      !Array.isArray(user.metadata)
+        ? user.metadata
+        : {};
+    if ((metadata as Record<string, unknown>).mustChangePassword === true) {
+      throw new BadRequestException('Bạn phải đổi mật khẩu mặc định trước');
+    }
+    if (!this.membership) throw new Error('MembershipService is required');
+    await this.membership.assertEligible(userId, true);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        metadata: { ...metadata, onboardingVersion: ONBOARDING_VERSION },
+        updatedAt: new Date(),
+      },
+    });
+    await this.sessionCache.invalidateUser(userId);
+    return { completed: true };
+  }
+
+  private async issueTokenPair(
+    user: TokenUser,
+    issuedAtMs: number = Date.now(),
+  ): Promise<{
     access_token: string;
     refresh_token: string;
   }> {
-    const issuedAtMs = Date.now();
     const cachedUser = this.toCachedAuthUser(user);
     await this.sessionCache.setUser(cachedUser);
 

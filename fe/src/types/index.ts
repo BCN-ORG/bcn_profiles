@@ -25,6 +25,7 @@ export type User = {
   }>;
   metadata?: {
     onboardingVersion?: number;
+    mustChangePassword?: boolean;
     maSV?: string;
     ngaySinh?: string;
     bio?: string;

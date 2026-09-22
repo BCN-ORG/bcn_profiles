@@ -610,7 +610,7 @@ export class UsersService implements OnModuleInit {
             fullName,
             avatar,
             phone: normalizedPhone,
-            metadata: metadata ? (metadata as any) : {},
+            metadata: { ...(metadata as object), mustChangePassword: true },
             status: 'ACTIVE',
             createdAt: new Date(),
             updatedAt: new Date(),

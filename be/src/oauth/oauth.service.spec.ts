@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { OauthService } from './oauth.service';
 
@@ -9,6 +9,7 @@ describe('OauthService', () => {
   let service: OauthService;
   let sessions: any;
   let authorization: any;
+  let prisma: any;
 
   beforeEach(() => {
     values = new Map();
@@ -44,7 +45,7 @@ describe('OauthService', () => {
       assertAccess: jest.fn(),
       audit: jest.fn(),
     };
-    const prisma = {
+    prisma = {
       applicationRedirectUri: {
         findUnique: jest.fn().mockResolvedValue({ id: 'redirect-1' }),
       },
@@ -139,6 +140,36 @@ describe('OauthService', () => {
         code_verifier: 'b'.repeat(43),
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+    expect(sessions.createAppSession).not.toHaveBeenCalled();
+  });
+
+  it('blocks app authorization until the default password is changed', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      metadata: { mustChangePassword: true },
+    });
+
+    await expect(
+      service.authorize(
+        {
+          client_id: 'bcn-quiz',
+          redirect_uri: 'https://quiz.bcn.id.vn/auth/callback',
+          response_type: 'code',
+          state: 'state',
+          code_challenge: challenge,
+          code_challenge_method: 'S256',
+        },
+        {
+          userId: 'user-1',
+          status: 'ACTIVE',
+          authLevel: 'AAL1',
+          createdAt: '',
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ),
+    ).rejects.toMatchObject<ForbiddenException>({
+      response: expect.objectContaining({ code: 'PASSWORD_CHANGE_REQUIRED' }),
+    });
     expect(sessions.createAppSession).not.toHaveBeenCalled();
   });
 });

@@ -90,6 +90,7 @@ async function main() {
       metadata: {
         maSV: student.maSV,
         ngaySinh: student.ngaySinh,
+        mustChangePassword: true,
       },
     };
   });
@@ -122,7 +123,15 @@ async function main() {
           phone: user.phone,
           role: user.role,
           status: user.status,
-          metadata: user.metadata,
+          metadata: {
+            ...(existingUser.metadata &&
+            typeof existingUser.metadata === 'object' &&
+            !Array.isArray(existingUser.metadata)
+              ? existingUser.metadata
+              : {}),
+            maSV: user.metadata.maSV,
+            ngaySinh: user.metadata.ngaySinh,
+          },
           updatedAt: user.updatedAt,
         },
       });

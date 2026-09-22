@@ -1,22 +1,13 @@
-import { Type } from 'class-transformer';
 import {
   IsBoolean,
-  IsInt,
   IsOptional,
   IsString,
   IsUrl,
   MaxLength,
-  Min,
   ValidateIf,
 } from 'class-validator';
 
 export class UserMetadataDto {
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  onboardingVersion?: number;
-
   @IsOptional()
   @IsString({ message: 'Bio phải là chuỗi' })
   @MaxLength(500, { message: 'Bio không được vượt quá 500 ký tự' })

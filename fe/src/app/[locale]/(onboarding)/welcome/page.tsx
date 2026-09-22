@@ -52,7 +52,13 @@ export default function WelcomePage() {
         </ul>
         <Button
           className="h-11 w-full text-base font-semibold"
-          onClick={() => router.push('/welcome/discord')}
+          onClick={() =>
+            router.push(
+              user?.metadata?.mustChangePassword
+                ? '/welcome/password'
+                : '/welcome/discord',
+            )
+          }
         >
           {t('start')}
         </Button>

@@ -27,6 +27,7 @@ import { EmailService } from './services/email.service';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { RequestEmailChangeDto } from './dto/request-email-change.dto';
 import { ConfirmEmailChangeDto } from './dto/confirm-email-change.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { TwoFactorAuthService } from './services/two-factor-auth.service';
 import { TwoFactorSetupGuard } from './guards/two-factor-setup.guard';
 import { TwoFactorRecoveryGuard } from './guards/two-factor-recovery.guard';
@@ -51,6 +52,7 @@ import {
   accessTokenCookieOptions,
   clearAuthCookies,
   refreshTokenCookieOptions,
+  setAuthCookies,
 } from '../common/cookies/auth-cookies';
 
 @Controller('auth')
@@ -214,6 +216,28 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  @Throttle({ default: { ttl: 900000, limit: 10 } })
+  @Post('change-password')
+  async changePassword(
+    @User() user: { id: string },
+    @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.changePassword(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
+      response.req.cookies?.bcn_sso as string | undefined,
+    );
+    setAuthCookies(response, response.req as Request, result);
+    return { message: result.message };
+  }
+
+  @Post('complete-onboarding')
+  completeOnboarding(@User() user: { id: string }) {
+    return this.authService.completeOnboarding(user.id);
   }
 
   @Throttle({ default: { ttl: 900000, limit: 30 } })

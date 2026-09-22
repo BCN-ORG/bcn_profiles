@@ -44,9 +44,6 @@ export function useAuth() {
 function OauthHandoffResume({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   const pathname = usePathname();
-  const [hadHandoff] = useState(
-    () => typeof window !== 'undefined' && Boolean(readOauthHandoff()),
-  );
   const [blocking, setBlocking] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -55,7 +52,10 @@ function OauthHandoffResume({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!hadHandoff) return;
+    if (!readOauthHandoff()) {
+      setBlocking(false);
+      return;
+    }
     if (pathname.startsWith('/login')) {
       setBlocking(false);
       return;
@@ -64,7 +64,7 @@ function OauthHandoffResume({ children }: { children: ReactNode }) {
       setBlocking(true);
       return;
     }
-    if (user) {
+    if (user && !needsOnboarding(user)) {
       setBlocking(true);
       const resume = takeOauthReturn();
       if (resume) {
@@ -73,7 +73,7 @@ function OauthHandoffResume({ children }: { children: ReactNode }) {
       }
     }
     setBlocking(false);
-  }, [hadHandoff, isLoading, user, pathname]);
+  }, [isLoading, user, pathname]);
 
   if (blocking) {
     return (

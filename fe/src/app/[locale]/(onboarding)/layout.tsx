@@ -15,9 +15,10 @@ import { needsOnboarding } from '@/lib/onboarding';
 import { Button } from '@/components/ui/primitives';
 
 function stepFromPath(pathname: string) {
-  if (pathname.includes('/ready')) return 4;
-  if (pathname.includes('/optional')) return 3;
-  if (pathname.includes('/discord')) return 2;
+  if (pathname.includes('/ready')) return 5;
+  if (pathname.includes('/optional')) return 4;
+  if (pathname.includes('/discord')) return 3;
+  if (pathname.includes('/password')) return 2;
   return 1;
 }
 
@@ -39,13 +40,22 @@ function OnboardingShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const t = useTranslations('welcome');
   const [leaving, setLeaving] = useState(false);
+  const needsPasswordChange = user?.metadata?.mustChangePassword === true;
 
   useEffect(() => {
     if (!user) return;
+    if (
+      needsPasswordChange &&
+      pathname !== '/welcome' &&
+      !pathname.startsWith('/welcome/password')
+    ) {
+      router.replace('/welcome/password');
+      return;
+    }
     if (!needsOnboarding(user) && !pathname.startsWith('/welcome/ready')) {
       router.replace('/');
     }
-  }, [user, pathname, router]);
+  }, [user, needsPasswordChange, pathname, router]);
 
   if (!user) return null;
 
@@ -95,7 +105,7 @@ function OnboardingShell({ children }: { children: ReactNode }) {
         <p className="mb-6 text-center text-sm text-muted-foreground">
           {t('guided')}
         </p>
-        <OnboardingSteps current={stepFromPath(pathname)} total={4} />
+        <OnboardingSteps current={stepFromPath(pathname)} total={5} />
         {children}
       </div>
     </main>

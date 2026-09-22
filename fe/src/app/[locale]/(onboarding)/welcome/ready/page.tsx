@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/primitives';
 import { useAuth } from '@/components/auth/auth-provider';
 import { profileService } from '@/services';
 import { useRouter } from '@/i18n/navigation';
-import { ONBOARDING_VERSION } from '@/lib/onboarding';
 import {
   Card,
   CardContent,
@@ -27,9 +26,7 @@ export default function WelcomeReadyPage() {
   async function finish() {
     setBusy(true);
     try {
-      await profileService.update({
-        metadata: { onboardingVersion: ONBOARDING_VERSION },
-      });
+      await profileService.completeOnboarding();
       await refresh();
       router.replace('/');
     } catch (error) {
@@ -44,7 +41,9 @@ export default function WelcomeReadyPage() {
         <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <PartyPopper className="size-7" aria-hidden />
         </span>
-        <CardTitle className="text-2xl font-semibold">{t('readyTitle')}</CardTitle>
+        <CardTitle className="text-2xl font-semibold">
+          {t('readyTitle')}
+        </CardTitle>
         <CardDescription className="text-base leading-relaxed">
           {t('readyBody')}
         </CardDescription>

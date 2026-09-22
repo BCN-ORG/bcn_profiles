@@ -1,8 +1,12 @@
 export const ONBOARDING_VERSION = 1;
 
 export function needsOnboarding(user: {
-  metadata?: { onboardingVersion?: number } | null;
+  metadata?: {
+    onboardingVersion?: number;
+    mustChangePassword?: boolean;
+  } | null;
 }): boolean {
+  if (user.metadata?.mustChangePassword === true) return true;
   const version = user.metadata?.onboardingVersion;
   return !(typeof version === 'number' && version >= ONBOARDING_VERSION);
 }
@@ -12,7 +16,5 @@ export function isAdmin(user: { role?: string } | null | undefined): boolean {
 }
 
 export function isOnboardingExemptPath(pathname: string): boolean {
-  return (
-    pathname.startsWith('/welcome') || pathname.startsWith('/admin')
-  );
+  return pathname.startsWith('/welcome') || pathname.startsWith('/admin');
 }

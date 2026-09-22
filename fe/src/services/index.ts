@@ -51,6 +51,8 @@ export const authService = {
     request.post("/auth/forgot-password", { email }),
   resetPassword: (email: string, otp: string, newPassword: string) =>
     request.post("/auth/reset-password", { email, otp, newPassword }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request.post("/auth/change-password", { currentPassword, newPassword }),
   requestEmailChange: (newEmail: string) =>
     request.post("/auth/change-email/request", { newEmail }),
   confirmEmailChange: (newEmail: string, otp: string) =>
@@ -106,6 +108,7 @@ export const authService = {
 };
 
 export const profileService = {
+  completeOnboarding: () => request.post("/auth/complete-onboarding"),
   update: (data: {
     fullName?: string;
     phone?: string;

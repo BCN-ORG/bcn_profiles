@@ -165,12 +165,23 @@ export class OauthService {
   private async assertUserAndAccess(userId: string, appId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { status: true },
+      select: { status: true, metadata: true },
     });
     if (!user || user.status !== 'ACTIVE') {
       throw new UnauthorizedException({
         code: 'ACCOUNT_BLOCKED',
         message: 'Account is not active',
+      });
+    }
+    if (
+      user.metadata &&
+      typeof user.metadata === 'object' &&
+      !Array.isArray(user.metadata) &&
+      (user.metadata as Record<string, unknown>).mustChangePassword === true
+    ) {
+      throw new ForbiddenException({
+        code: 'PASSWORD_CHANGE_REQUIRED',
+        message: 'Default password must be changed before app access',
       });
     }
     const membership = await this.membership.assertEligible(userId);

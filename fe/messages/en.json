@@ -141,6 +141,15 @@
     "point2": "Optionally link Google / GitHub for faster sign-in later",
     "point3": "Enter Account Center and use BCN apps",
     "start": "Get started",
+    "passwordEyebrow": "Account security",
+    "passwordTitle": "Change your default password",
+    "passwordBody": "Set your own password before connecting accounts and using the BCN ecosystem.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "changePassword": "Change password and continue",
+    "passwordMismatch": "The confirmation password does not match.",
+    "passwordChanged": "Password changed.",
     "step": "Step {current} / {total}",
     "discordTitle": "Connect Discord",
     "discordBody": "Discord is required to verify BCN membership. Join the BCN server before connecting.",
@@ -303,6 +312,7 @@
     "hint": "Ask a BCN admin if you need access to this application.",
     "viewApps": "View my applications",
     "fixMembership": "Verify membership",
+    "changePassword": "Change default password",
     "retry": "Try signing in again",
     "backToApp": "Back to {app}",
     "connections": "Connections",
@@ -328,6 +338,10 @@
     "MEMBERSHIP_REQUIRED": {
       "title": "BCN membership not verified",
       "body": "App access alone is not enough. Link Discord (or Zalo) and verify membership before opening {app}."
+    },
+    "PASSWORD_CHANGE_REQUIRED": {
+      "title": "Default password must be changed",
+      "body": "Set your own BCN account password before opening {app}."
     },
     "OAUTH_REDIRECT_URI_INVALID": {
       "title": "Invalid redirect URI",

@@ -16,11 +16,7 @@ import {
 import { Button } from '@/components/ui/primitives';
 import { useRouter } from '@/i18n/navigation';
 import { needsOnboarding } from '@/lib/onboarding';
-import {
-  clearAuthStep,
-  readAuthStep,
-  writeAuthStep,
-} from '@/lib/auth-step';
+import { clearAuthStep, readAuthStep, writeAuthStep } from '@/lib/auth-step';
 import type { User } from '@/types';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,9 +53,7 @@ export default function LoginPage() {
   const continuingToApp = Boolean(oauthReturn);
   const appName = oauthAppName(search, to('unknownApp'));
   const appReturn = (() => {
-    const raw =
-      search.get('app_return')?.trim() ||
-      undefined;
+    const raw = search.get('app_return')?.trim() || undefined;
     if (!raw) return null;
     try {
       const url = new URL(raw);
@@ -122,12 +116,16 @@ export default function LoginPage() {
   useEffect(() => {
     if (!isLoading && user) {
       clearAuthStep();
+      if (needsOnboarding(user)) {
+        router.replace('/welcome');
+        return;
+      }
       const resume = resolveOauthReturn(oauthReturnQuery);
       if (resume) {
         leaveToOauth(resume);
         return;
       }
-      router.replace(needsOnboarding(user) ? '/welcome' : next);
+      router.replace(next);
     }
   }, [isLoading, user, router, next, oauthReturnQuery]);
 
@@ -177,12 +175,16 @@ export default function LoginPage() {
       return;
     }
     setUser(me);
+    if (needsOnboarding(me)) {
+      router.replace('/welcome');
+      return;
+    }
     const resume = resolveOauthReturn(oauthReturnQuery);
     if (resume) {
       leaveToOauth(resume);
       return;
     }
-    router.replace(needsOnboarding(me) ? '/welcome' : next);
+    router.replace(next);
   }
 
   async function startSocial(
@@ -450,7 +452,9 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <p className="text-xs text-muted-foreground">{t('setupPasswordHint')}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('setupPasswordHint')}
+            </p>
           </div>
         ) : null}
 

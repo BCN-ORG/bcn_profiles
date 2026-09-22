@@ -141,6 +141,15 @@
     "point2": "Tuỳ chọn liên kết Google / GitHub để đăng nhập nhanh sau này",
     "point3": "Vào Account Center và dùng các ứng dụng BCN",
     "start": "Bắt đầu",
+    "passwordEyebrow": "Bảo mật tài khoản",
+    "passwordTitle": "Đổi mật khẩu mặc định",
+    "passwordBody": "Hãy đặt mật khẩu riêng trước khi kết nối các tài khoản và sử dụng hệ sinh thái BCN.",
+    "currentPassword": "Mật khẩu hiện tại",
+    "newPassword": "Mật khẩu mới",
+    "confirmPassword": "Xác nhận mật khẩu mới",
+    "changePassword": "Đổi mật khẩu và tiếp tục",
+    "passwordMismatch": "Mật khẩu xác nhận không khớp.",
+    "passwordChanged": "Đã đổi mật khẩu.",
     "step": "Bước {current} / {total}",
     "discordTitle": "Kết nối Discord",
     "discordBody": "Discord là bước bắt buộc để xác minh tư cách thành viên BCN. Hãy tham gia server BCN trước khi kết nối.",
@@ -303,6 +312,7 @@
     "hint": "Liên hệ admin BCN nếu bạn cần quyền vào ứng dụng này.",
     "viewApps": "Xem ứng dụng của tôi",
     "fixMembership": "Xác minh thành viên BCN",
+    "changePassword": "Đổi mật khẩu mặc định",
     "retry": "Thử đăng nhập lại",
     "backToApp": "Quay lại {app}",
     "connections": "Kết nối",
@@ -328,6 +338,10 @@
     "MEMBERSHIP_REQUIRED": {
       "title": "Chưa xác minh thành viên BCN",
       "body": "Chỉ cấp quyền ứng dụng là chưa đủ. Bạn cần liên kết Discord (hoặc Zalo) và xác minh tư cách thành viên trước khi mở {app}."
+    },
+    "PASSWORD_CHANGE_REQUIRED": {
+      "title": "Cần đổi mật khẩu mặc định",
+      "body": "Hãy đặt mật khẩu riêng cho tài khoản BCN trước khi mở {app}."
     },
     "OAUTH_REDIRECT_URI_INVALID": {
       "title": "Địa chỉ callback không hợp lệ",

@@ -22,12 +22,15 @@ async function main() {
   const hashed = await bcrypt.hash(DEFAULT_PASSWORD, 10);
 
   // Chỉ reset user đăng ký bằng EMAIL (Google OAuth không có password local)
-  const result = await prisma.user.updateMany({
-    where: { typeAuth: 'EMAIL' },
-    data: { password: hashed },
-  });
+  const count = await prisma.$executeRaw`
+    UPDATE "users"
+    SET "password" = ${hashed},
+        "metadata" = COALESCE("metadata", '{}'::jsonb) || '{"mustChangePassword":true}'::jsonb,
+        "updatedAt" = NOW()
+    WHERE "typeAuth" = 'EMAIL'
+  `;
 
-  console.log(`✅ Done — ${result.count} user(s) updated.\n`);
+  console.log(`✅ Done — ${count} user(s) updated.\n`);
 }
 
 main()

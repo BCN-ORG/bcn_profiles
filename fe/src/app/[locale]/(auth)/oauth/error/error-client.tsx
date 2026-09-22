@@ -7,10 +7,7 @@ import { AuthLinkRow, AuthShell } from '@/components/layout/auth-shell';
 import { Button } from '@/components/ui/primitives';
 import { Link } from '@/i18n/navigation';
 import { oauthAppName } from '@/lib/oauth-app-name';
-import {
-  isOauthAuthorizeReturn,
-  readOauthHandoff,
-} from '@/lib/oauth-handoff';
+import { isOauthAuthorizeReturn, readOauthHandoff } from '@/lib/oauth-handoff';
 
 const CODES = [
   'APP_ACCESS_DENIED',
@@ -18,6 +15,7 @@ const CODES = [
   'STEP_UP_AUTH_REQUIRED',
   'ACCOUNT_BLOCKED',
   'MEMBERSHIP_REQUIRED',
+  'PASSWORD_CHANGE_REQUIRED',
   'OAUTH_REDIRECT_URI_INVALID',
   'APPLICATION_NOT_FOUND',
   'OAUTH_ERROR',
@@ -55,9 +53,17 @@ export default function OauthErrorPage() {
   const oauthReturn = safeOauthReturn(search.get('oauth_return'));
   const appReturn = safeAppReturn(search.get('app_return'));
   const primaryHref =
-    code === 'MEMBERSHIP_REQUIRED' ? '/membership' : '/applications';
+    code === 'PASSWORD_CHANGE_REQUIRED'
+      ? '/welcome/password'
+      : code === 'MEMBERSHIP_REQUIRED'
+        ? '/membership'
+        : '/applications';
   const primaryLabel =
-    code === 'MEMBERSHIP_REQUIRED' ? t('fixMembership') : t('viewApps');
+    code === 'PASSWORD_CHANGE_REQUIRED'
+      ? t('changePassword')
+      : code === 'MEMBERSHIP_REQUIRED'
+        ? t('fixMembership')
+        : t('viewApps');
 
   return (
     <AuthShell
@@ -76,7 +82,11 @@ export default function OauthErrorPage() {
           <Link href={primaryHref}>{primaryLabel}</Link>
         </Button>
         {oauthReturn ? (
-          <Button asChild variant="outline" className="h-11 w-full font-semibold">
+          <Button
+            asChild
+            variant="outline"
+            className="h-11 w-full font-semibold"
+          >
             <a href={oauthReturn}>{t('retry')}</a>
           </Button>
         ) : null}
