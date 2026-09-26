@@ -59,11 +59,26 @@ describe('ApplicationsAdminService', () => {
     };
   }
 
-  it('rejects permissions belonging to another application', async () => {
-    const { service } = setup();
+  it('rejects creating a permission outside the app manifest', async () => {
+    const { service, prisma } = setup();
     await expect(
-      service.createPermission('quiz', { code: 'event.checkin.execute' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+      service.createPermission('quiz', { code: 'quiz.question.read' }),
+    ).rejects.toThrow(/manifest/i);
+    expect(prisma.permission.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects creating or deleting catalog roles and permissions', async () => {
+    const { service, prisma } = setup();
+    await expect(
+      service.createRole('quiz', { code: 'HELPER' }),
+    ).rejects.toThrow(/manifest/i);
+    await expect(service.deleteRole('quiz', 'ADMIN')).rejects.toThrow(
+      /manifest/i,
+    );
+    await expect(
+      service.deletePermission('quiz', 'quiz.question.read'),
+    ).rejects.toThrow(/manifest/i);
+    expect(prisma.permission.create).not.toHaveBeenCalled();
   });
 
   it('replaces a role permission set and invalidates the whole app cache', async () => {

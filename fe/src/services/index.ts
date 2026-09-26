@@ -361,16 +361,6 @@ export const rbacService = {
     request.delete(`/admin/applications/${code}/redirect-uris`, {
       redirectUri,
     }),
-  createRole: (code: string, body: { code: string; name?: string }) =>
-    request.post(`/admin/applications/${code}/roles`, body),
-  deleteRole: (code: string, role: string) =>
-    request.delete(`/admin/applications/${code}/roles/${role}`),
-  createPermission: (
-    code: string,
-    body: { code: string; description?: string },
-  ) => request.post(`/admin/applications/${code}/permissions`, body),
-  deletePermission: (code: string, permission: string) =>
-    request.delete(`/admin/applications/${code}/permissions/${permission}`),
   grantRolePermission: (code: string, role: string, permission: string) =>
     request.post(
       `/admin/applications/${code}/roles/${role}/permissions/${permission}`,

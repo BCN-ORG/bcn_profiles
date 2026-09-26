@@ -251,25 +251,10 @@ export class ApplicationsAdminService {
   async createRole(
     appCode: string,
     body: { code: string; name?: string; description?: string },
-  ) {
-    const app = await this.findApplication(appCode);
-    const code = body.code.trim().toUpperCase();
-    if (!/^[A-Z][A-Z0-9_-]*$/.test(code)) {
-      throw new BadRequestException('Role code is invalid');
-    }
-    const role = await this.prisma.appRole.create({
-      data: {
-        id: `${app.id}-role-${code.toLowerCase()}`,
-        applicationId: app.id,
-        code,
-        name: body.name?.trim() || code,
-        description: body.description?.trim(),
-      },
-    });
-    await this.authorization.audit(null, 'ROLE_CREATED', app.code, {
-      role: code,
-    });
-    return role;
+  ): Promise<never> {
+    void appCode;
+    void body;
+    this.rejectCatalogMutation();
   }
 
   async listRoles(appCode: string) {
@@ -302,50 +287,19 @@ export class ApplicationsAdminService {
     return result;
   }
 
-  async deleteRole(appCode: string, roleCode: string) {
-    const app = await this.findApplication(appCode);
-    const role = await this.prisma.appRole.findUnique({
-      where: {
-        applicationId_code: {
-          applicationId: app.id,
-          code: roleCode.toUpperCase(),
-        },
-      },
-    });
-    if (!role) throw new NotFoundException('Role not found');
-    if (role.isSystem)
-      throw new BadRequestException('System roles cannot be deleted');
-    await this.prisma.userAppRole.deleteMany({ where: { roleId: role.id } });
-    await this.prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
-    await this.prisma.appRole.delete({ where: { id: role.id } });
-    await Promise.all([
-      this.authorization.invalidateApplication(app.id, app.code),
-      this.authorization.audit(null, 'ROLE_DELETED', app.code, {
-        role: role.code,
-      }),
-    ]);
-    return { deleted: true };
+  async deleteRole(appCode: string, roleCode: string): Promise<never> {
+    void appCode;
+    void roleCode;
+    this.rejectCatalogMutation();
   }
 
   async createPermission(
     appCode: string,
     body: { code: string; description?: string },
-  ) {
-    const app = await this.findApplication(appCode);
-    const code = body.code.trim();
-    this.validatePermissionCode(app.code, code);
-    const permission = await this.prisma.permission.create({
-      data: {
-        id: `${app.id}-perm-${code.replace(/\./g, '-')}`,
-        applicationId: app.id,
-        code,
-        description: body.description?.trim(),
-      },
-    });
-    await this.authorization.audit(null, 'PERMISSION_CREATED', app.code, {
-      permission: code,
-    });
-    return permission;
+  ): Promise<never> {
+    void appCode;
+    void body;
+    this.rejectCatalogMutation();
   }
 
   async listPermissions(appCode: string) {
@@ -378,28 +332,13 @@ export class ApplicationsAdminService {
     return result;
   }
 
-  async deletePermission(appCode: string, permissionCode: string) {
-    const app = await this.findApplication(appCode);
-    const permission = await this.prisma.permission.findUnique({
-      where: {
-        applicationId_code: {
-          applicationId: app.id,
-          code: permissionCode,
-        },
-      },
-    });
-    if (!permission) throw new NotFoundException('Permission not found');
-    await this.prisma.rolePermission.deleteMany({
-      where: { permissionId: permission.id },
-    });
-    await this.prisma.permission.delete({ where: { id: permission.id } });
-    await Promise.all([
-      this.authorization.invalidateApplication(app.id, app.code),
-      this.authorization.audit(null, 'PERMISSION_DELETED', app.code, {
-        permission: permission.code,
-      }),
-    ]);
-    return { deleted: true };
+  async deletePermission(
+    appCode: string,
+    permissionCode: string,
+  ): Promise<never> {
+    void appCode;
+    void permissionCode;
+    this.rejectCatalogMutation();
   }
 
   async grantPermissionToRole(
@@ -684,6 +623,13 @@ export class ApplicationsAdminService {
       }),
     ]);
     return this.getApplication(code);
+  }
+
+  /** Catalog comes from the app manifest. Platform admin only rebinds existing codes. */
+  private rejectCatalogMutation(): never {
+    throw new BadRequestException(
+      'Roles and permissions are registered by the application manifest. Re-import the manifest to add or remove them. You can only grant or revoke permissions that are already registered.',
+    );
   }
 
   private async findRole(appCode: string, roleCode: string) {

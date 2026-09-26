@@ -225,7 +225,7 @@ Hiện **bắt buộc nguồn gán là Profiles** (UI hoặc API admin ở trên
 
 Có thể làm màn hình trong Judge admin **chỉ nếu** backend Judge gọi hộ API admin Profiles bằng phiên của user đang là application manager — vẫn ghi vào Profiles. Mặc định: dùng Profiles RBAC; chưa có proxy sẵn trong contract.
 
-Catalog role/permission: manifest hoặc `POST/PATCH /admin/applications/:app/roles`. Gán manager (platform admin):
+Catalog role/permission chỉ qua import manifest. Profiles admin được grant/revoke permission đã có, không tạo hoặc xóa role/permission. Gán manager (platform admin):
 
 ```http
 POST /api/admin/applications/JUDGE/managers/:userId

@@ -101,8 +101,6 @@ export default function AdminRbacPage() {
     accessMode: 'MANUAL' as 'MANUAL' | 'MEMBERS',
   });
   const [newUri, setNewUri] = useState('');
-  const [newRole, setNewRole] = useState({ code: '', name: '' });
-  const [newPerm, setNewPerm] = useState({ code: '', description: '' });
   const [managerUserId, setManagerUserId] = useState('');
   const [memberUserId, setMemberUserId] = useState('');
   const [manifest, setManifest] = useState('');
@@ -148,9 +146,6 @@ export default function AdminRbacPage() {
     app?.roles[0] ??
     null;
   const activeRoleCode = activeRole?.code ?? null;
-  const permissionCodeExample =
-    app?.permissions[0]?.code ??
-    `${(activeCode ?? 'APP').toLowerCase()}.question.read`;
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: ['admin', 'rbac'] });
@@ -714,58 +709,7 @@ export default function AdminRbacPage() {
                       <CardTitle className="text-sm">{t('tabRoles')}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 p-3">
-                      {platformAdmin ? (
-                        <form
-                          className="space-y-3 rounded-lg border border-dashed border-border p-3"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            run(async () => {
-                              await rbacService.createRole(app.code, newRole);
-                              setSelectedRole(newRole.code.toUpperCase());
-                              setNewRole({ code: '', name: '' });
-                            });
-                          }}
-                        >
-                          <div className="space-y-1.5">
-                            <Label htmlFor="new-role-code">{t('roleCode')}</Label>
-                            <Input
-                              id="new-role-code"
-                              value={newRole.code}
-                              onChange={(e) =>
-                                setNewRole((r) => ({
-                                  ...r,
-                                  code: e.target.value,
-                                }))
-                              }
-                              required
-                              className="h-9"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="new-role-name">{t('roleName')}</Label>
-                            <Input
-                              id="new-role-name"
-                              value={newRole.name}
-                              onChange={(e) =>
-                                setNewRole((r) => ({
-                                  ...r,
-                                  name: e.target.value,
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          </div>
-                          <Button
-                            type="submit"
-                            size="sm"
-                            className="w-full"
-                            disabled={busy}
-                          >
-                            <Plus className="size-3.5" aria-hidden />
-                            {t('addRole')}
-                          </Button>
-                        </form>
-                      ) : null}
+                      <p className="px-1 text-xs text-muted-foreground">{t('accessHint')}</p>
                       <div
                         className="flex flex-col gap-1"
                         aria-label={t('tabRoles')}
@@ -805,42 +749,6 @@ export default function AdminRbacPage() {
                                   </span>
                                 </span>
                               </button>
-                              {platformAdmin ? (
-                                <ConfirmDialog
-                                  title={t('deleteRoleTitle', {
-                                    role: roleLabel(role),
-                                  })}
-                                  description={t('deleteRoleConfirm')}
-                                  confirmLabel={t('deleteRoleAction')}
-                                  cancelLabel={tc('cancel')}
-                                  pendingLabel={tc('loading')}
-                                  onConfirm={() =>
-                                    run(() =>
-                                      rbacService.deleteRole(
-                                        app.code,
-                                        role.code,
-                                      ),
-                                    )
-                                  }
-                                  trigger={
-                                    <Button
-                                      type="button"
-                                      size="icon"
-                                      variant="ghost"
-                                      className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                      disabled={busy || role.isSystem}
-                                      aria-label={t('deleteRoleAction')}
-                                      title={
-                                        role.isSystem
-                                          ? t('systemRoleHint')
-                                          : t('deleteRoleAction')
-                                      }
-                                    >
-                                      <Trash2 className="size-3.5" />
-                                    </Button>
-                                  }
-                                />
-                              ) : null}
                             </div>
                           );
                         })}
@@ -863,61 +771,6 @@ export default function AdminRbacPage() {
                       <CardDescription>{t('accessHint')}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {platformAdmin ? (
-                        <form
-                          className="grid gap-3 rounded-lg border border-dashed border-border p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            run(async () => {
-                              await rbacService.createPermission(
-                                app.code,
-                                newPerm,
-                              );
-                              setNewPerm({ code: '', description: '' });
-                            });
-                          }}
-                        >
-                          <div className="space-y-1.5">
-                            <Label htmlFor="new-permission-description">
-                              {t('permDesc')}
-                            </Label>
-                            <Input
-                              id="new-permission-description"
-                              placeholder={t('permDescPlaceholder')}
-                              value={newPerm.description}
-                              onChange={(e) =>
-                                setNewPerm((p) => ({
-                                  ...p,
-                                  description: e.target.value,
-                                }))
-                              }
-                              className="h-9"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="new-permission-code">
-                              {t('permCode')}
-                            </Label>
-                            <Input
-                              id="new-permission-code"
-                              placeholder={permissionCodeExample}
-                              value={newPerm.code}
-                              onChange={(e) =>
-                                setNewPerm((p) => ({
-                                  ...p,
-                                  code: e.target.value,
-                                }))
-                              }
-                              required
-                              className="h-9 font-mono text-xs"
-                            />
-                          </div>
-                          <Button type="submit" size="sm" disabled={busy}>
-                            <Plus className="size-3.5" aria-hidden />
-                            {t('addPerm')}
-                          </Button>
-                        </form>
-                      ) : null}
 
                       {!app.permissions.length ? (
                         <EmptyState title={t('noPermsYet')} />
@@ -981,39 +834,6 @@ export default function AdminRbacPage() {
                                     ) : null}
                                   </span>
                                 </label>
-                                {platformAdmin ? (
-                                  <ConfirmDialog
-                                    title={t('deletePermissionTitle', {
-                                      permission: permissionLabel(perm),
-                                    })}
-                                    description={t('deletePermissionConfirm')}
-                                    confirmLabel={t('deletePermissionAction')}
-                                    cancelLabel={tc('cancel')}
-                                    pendingLabel={tc('loading')}
-                                    onConfirm={() =>
-                                      run(() =>
-                                        rbacService.deletePermission(
-                                          app.code,
-                                          perm.code,
-                                        ),
-                                      )
-                                    }
-                                    trigger={
-                                      <Button
-                                        type="button"
-                                        size="icon"
-                                        variant="ghost"
-                                        className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                        disabled={busy}
-                                        aria-label={t(
-                                          'deletePermissionAction',
-                                        )}
-                                      >
-                                        <Trash2 className="size-3.5" />
-                                      </Button>
-                                    }
-                                  />
-                                ) : null}
                               </li>
                             );
                           })}
