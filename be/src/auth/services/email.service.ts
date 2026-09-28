@@ -186,6 +186,37 @@ export class EmailService {
     }
   }
 
+  async sendAccountDeletedEmail(
+    email: string,
+    fullName?: string,
+  ): Promise<void> {
+    const safeName = this.escape(fullName);
+    const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #111827;">Thông báo đóng tài khoản BCN Profiles</h2>
+          <p>Xin chào${safeName ? ` <b>${safeName}</b>` : ''},</p>
+          <p>Tài khoản BCN Profiles của bạn đã được admin đóng và xóa khỏi hệ thống.</p>
+          <p>Cảm ơn bạn đã đồng hành cùng cộng đồng BCN trong thời gian qua.</p>
+          <p>Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ với chúng tôi để được hỗ trợ.</p>
+          <p style="margin-top:24px;color:#6b7280;font-size:12px;">© ${new Date().getFullYear()} BCN Profiles</p>
+        </div>
+      `;
+
+    try {
+      await this.sendMail('account-deleted-email', {
+        to: email,
+        subject: 'Thông báo đóng tài khoản - BCN Profiles',
+        html,
+      });
+    } catch (error) {
+      this.logger.error(
+        'Error sending account deleted email',
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new Error('Không thể gửi email thông báo. Vui lòng thử lại sau.');
+    }
+  }
+
   async sendApprovalEmail(email: string, fullName?: string): Promise<void> {
     const safeName = this.escape(fullName);
     const loginUrl = new URL('/login', this.frontendUrl).href;

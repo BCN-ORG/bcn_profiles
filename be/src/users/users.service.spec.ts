@@ -64,6 +64,7 @@ describe('UsersService avatar behavior', () => {
       { invalidateAll: jest.fn() } as never,
       minio as never,
       { delByPrefix: jest.fn() } as never,
+      { get: jest.fn() } as never,
     );
   });
 
@@ -156,6 +157,82 @@ describe('UsersService avatar behavior', () => {
   });
 });
 
+describe('UsersService deleteUser', () => {
+  const userId = 'user-1';
+  const avatarPublicId = `user-avatars/${userId}/old-avatar`;
+  let fetchMock: jest.SpiedFunction<typeof fetch>;
+
+  afterEach(() => {
+    fetchMock?.mockRestore();
+  });
+
+  it('notifies the user and removes their Discord guild membership before deleting', async () => {
+    const prisma = {
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: userId,
+          email: 'user@example.test',
+          fullName: 'Test User',
+          avatarPublicId,
+          externalIdentities: [{ providerSubject: 'discord-1' }],
+        }),
+        delete: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const email = {
+      sendAccountDeletedEmail: jest.fn().mockResolvedValue(undefined),
+    };
+    const sessionCache = { invalidateUser: jest.fn() };
+    const listCache = { invalidateAll: jest.fn() };
+    const minio = { deleteImage: jest.fn().mockResolvedValue(undefined) };
+    const config = {
+      get: jest.fn((key: string) =>
+        key === 'DISCORD_GUILD_ID'
+          ? 'guild-1'
+          : key === 'DISCORD_BOT_TOKEN'
+            ? 'bot-token'
+            : undefined,
+      ),
+    };
+    fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }));
+
+    const service = new UsersService(
+      prisma as never,
+      email as never,
+      sessionCache as never,
+      listCache as never,
+      minio as never,
+      { delByPrefix: jest.fn() } as never,
+      config as never,
+    );
+
+    await service.deleteUser(userId);
+
+    expect(email.sendAccountDeletedEmail).toHaveBeenCalledWith(
+      'user@example.test',
+      'Test User',
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://discord.com/api/v10/guilds/guild-1/members/discord-1',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: expect.objectContaining({
+          authorization: 'Bot bot-token',
+        }),
+      }),
+    );
+    expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: userId } });
+    expect(prisma.user.delete.mock.invocationCallOrder[0]).toBeLessThan(
+      email.sendAccountDeletedEmail.mock.invocationCallOrder[0],
+    );
+    expect(minio.deleteImage).toHaveBeenCalledWith(avatarPublicId);
+    expect(sessionCache.invalidateUser).toHaveBeenCalledWith(userId);
+    expect(listCache.invalidateAll).toHaveBeenCalled();
+  });
+});
+
 describe('UsersService public profile', () => {
   const userId = 'user-1';
   const listCache = {
@@ -181,6 +258,7 @@ describe('UsersService public profile', () => {
       listCache as never,
       {} as never,
       { delByPrefix: jest.fn() } as never,
+      { get: jest.fn() } as never,
     );
   });
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { KeyRound } from 'lucide-react';
+import { Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -20,12 +20,18 @@ import { authService } from '@/services';
 
 export default function WelcomePasswordPage() {
   const t = useTranslations('welcome');
+  const tl = useTranslations('login');
   const tc = useTranslations('common');
   const { refresh } = useAuth();
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [visible, setVisible] = useState({
+    current: false,
+    next: false,
+    confirm: false,
+  });
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent) {
@@ -64,38 +70,110 @@ export default function WelcomePasswordPage() {
         <form className="space-y-4" onSubmit={submit}>
           <div className="space-y-2">
             <Label htmlFor="current-password">{t('currentPassword')}</Label>
-            <Input
-              id="current-password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-            />
+            <div className="relative">
+              <Input
+                id="current-password"
+                type={visible.current ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                className="pr-11"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute top-0.5 right-0.5 size-10"
+                aria-label={
+                  visible.current ? tl('hidePassword') : tl('showPassword')
+                }
+                onClick={() =>
+                  setVisible((value) => ({
+                    ...value,
+                    current: !value.current,
+                  }))
+                }
+              >
+                {visible.current ? (
+                  <EyeOff size={18} aria-hidden />
+                ) : (
+                  <Eye size={18} aria-hidden />
+                )}
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="new-password">{t('newPassword')}</Label>
-            <Input
-              id="new-password"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              required
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-            />
+            <div className="relative">
+              <Input
+                id="new-password"
+                type={visible.next ? 'text' : 'password'}
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                className="pr-11"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute top-0.5 right-0.5 size-10"
+                aria-label={
+                  visible.next ? tl('hidePassword') : tl('showPassword')
+                }
+                onClick={() =>
+                  setVisible((value) => ({
+                    ...value,
+                    next: !value.next,
+                  }))
+                }
+              >
+                {visible.next ? (
+                  <EyeOff size={18} aria-hidden />
+                ) : (
+                  <Eye size={18} aria-hidden />
+                )}
+              </Button>
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirm-password">{t('confirmPassword')}</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              required
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-            />
+            <div className="relative">
+              <Input
+                id="confirm-password"
+                type={visible.confirm ? 'text' : 'password'}
+                autoComplete="new-password"
+                minLength={8}
+                required
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                className="pr-11"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute top-0.5 right-0.5 size-10"
+                aria-label={
+                  visible.confirm ? tl('hidePassword') : tl('showPassword')
+                }
+                onClick={() =>
+                  setVisible((value) => ({
+                    ...value,
+                    confirm: !value.confirm,
+                  }))
+                }
+              >
+                {visible.confirm ? (
+                  <EyeOff size={18} aria-hidden />
+                ) : (
+                  <Eye size={18} aria-hidden />
+                )}
+              </Button>
+            </div>
           </div>
           <Button className="h-11 w-full font-semibold" disabled={busy}>
             {busy ? tc('loading') : t('changePassword')}

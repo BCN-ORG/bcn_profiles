@@ -61,6 +61,15 @@ type JwtTokenPayload = {
   exp?: number;
 };
 
+function clearPasswordChangeRequirement(metadata: Record<string, unknown>) {
+  if (metadata.mustChangePassword !== true) {
+    return { ...metadata, mustChangePassword: false };
+  }
+  const { onboardingVersion, ...rest } = metadata;
+  void onboardingVersion;
+  return { ...rest, mustChangePassword: false };
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -569,14 +578,13 @@ export class AuthService {
       where: { email },
       data: {
         password: hashedPassword,
-        metadata: {
-          ...(user.metadata &&
-          typeof user.metadata === 'object' &&
-          !Array.isArray(user.metadata)
-            ? user.metadata
-            : {}),
-          mustChangePassword: false,
-        },
+        metadata: clearPasswordChangeRequirement(
+          user.metadata &&
+            typeof user.metadata === 'object' &&
+            !Array.isArray(user.metadata)
+            ? (user.metadata as Record<string, unknown>)
+            : {},
+        ),
         updatedAt: new Date(),
       },
     });
@@ -632,7 +640,9 @@ export class AuthService {
         ? user.metadata
         : {};
     const updatedAt = new Date();
-    const updatedMetadata = { ...metadata, mustChangePassword: false };
+    const updatedMetadata = clearPasswordChangeRequirement(
+      metadata as Record<string, unknown>,
+    );
     await this.prisma.user.update({
       where: { id: userId },
       data: {

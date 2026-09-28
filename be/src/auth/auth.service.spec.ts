@@ -121,7 +121,11 @@ describe('AuthService', () => {
   it('changes a default password and clears the required-change flag', async () => {
     prisma.user.findUnique.mockResolvedValue({
       password: await bcrypt.hash('111111', 4),
-      metadata: { mustChangePassword: true, cohort: 'K20' },
+      metadata: {
+        mustChangePassword: true,
+        cohort: 'K20',
+        onboardingVersion: 1,
+      },
     });
 
     const result = await service.changePassword('u1', '111111', 'new-password');
@@ -144,6 +148,22 @@ describe('AuthService', () => {
       'u1',
       undefined,
     );
+  });
+
+  it('preserves completed onboarding when changing a regular password', async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      password: await bcrypt.hash('old-password', 4),
+      metadata: { mustChangePassword: false, onboardingVersion: 1 },
+    });
+
+    await service.changePassword('u1', 'old-password', 'new-password');
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: expect.objectContaining({
+        metadata: { mustChangePassword: false, onboardingVersion: 1 },
+      }),
+    });
   });
 
   it('marks an existing account when it logs in with the default password', async () => {

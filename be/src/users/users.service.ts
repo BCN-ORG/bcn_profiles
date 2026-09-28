@@ -5,8 +5,10 @@ import {
   ConflictException,
   Logger,
   OnModuleInit,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { User, UserStatus } from 'prisma/client/client';
 import * as bcrypt from 'bcrypt';
@@ -91,6 +93,7 @@ export class UsersService implements OnModuleInit {
     private readonly listCache: UsersListCacheService,
     private readonly minioService: MinioService,
     private readonly redis: RedisService,
+    private readonly config: ConfigService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -798,6 +801,13 @@ export class UsersService implements OnModuleInit {
   async deleteUser(id: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id },
+      include: {
+        externalIdentities: {
+          where: { provider: 'DISCORD' },
+          select: { providerSubject: true },
+          take: 1,
+        },
+      },
     });
 
     if (!user) {
@@ -805,14 +815,62 @@ export class UsersService implements OnModuleInit {
     }
 
     const avatarPublicId = user.avatarPublicId;
+    await this.kickDiscordMember(user.externalIdentities?.[0]?.providerSubject);
+
     await this.prisma.user.delete({
       where: { id },
     });
+    await this.notifyUserDeleted(user.email, user.fullName || undefined);
     if (avatarPublicId) {
       await this.minioService.deleteImage(avatarPublicId);
     }
     await this.sessionCache.invalidateUser(id);
     await this.invalidateListCaches();
+  }
+
+  private async notifyUserDeleted(
+    email: string,
+    fullName?: string,
+  ): Promise<void> {
+    try {
+      await this.emailService.sendAccountDeletedEmail(email, fullName);
+    } catch (error) {
+      this.logger.error(
+        'Failed to send account deleted email',
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  private async kickDiscordMember(discordUserId?: string): Promise<void> {
+    if (!discordUserId) return;
+    const guildId = this.config.get<string>('DISCORD_GUILD_ID')?.trim();
+    const botToken = this.config.get<string>('DISCORD_BOT_TOKEN')?.trim();
+    if (!guildId || !botToken) {
+      this.logger.warn(
+        'Discord kick skipped because DISCORD_GUILD_ID or DISCORD_BOT_TOKEN is not configured',
+      );
+      return;
+    }
+
+    const response = await fetch(
+      `https://discord.com/api/v10/guilds/${encodeURIComponent(guildId)}/members/${encodeURIComponent(discordUserId)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bot ${botToken}`,
+          'x-audit-log-reason': encodeURIComponent(
+            'BCN Profiles user deleted by admin',
+          ),
+        },
+      },
+    );
+    if (response.ok || response.status === 404) return;
+
+    throw new ServiceUnavailableException({
+      code: 'DISCORD_KICK_FAILED',
+      message: 'Discord member could not be removed',
+    });
   }
 
   async updateUser(
