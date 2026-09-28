@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      diagnose_network:
+        description: Diagnose GHCR connectivity on the production runner
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,6 +27,7 @@ env:
 jobs:
   backend:
     name: Test BE, Build & Push Image
+    if: ${{ !inputs.diagnose_network }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -79,6 +85,7 @@ jobs:
 
   frontend:
     name: Test FE, Build & Push Image
+    if: ${{ !inputs.diagnose_network }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -133,6 +140,7 @@ jobs:
 
   deploy:
     name: Deploy Production
+    if: ${{ !inputs.diagnose_network }}
     needs: [backend, frontend]
     runs-on: [self-hosted, linux, production, docker, bcn-org]
     environment: production
@@ -254,3 +262,30 @@ jobs:
       - name: Remove rollback configuration after success
         if: ${{ success() }}
         run: rm -f "$PROJECT_DIR/.env.rollback" "$PROJECT_DIR/.env.compose.rollback" "$PROJECT_DIR/docker-compose.yml.rollback"
+
+  diagnose:
+    name: Diagnose GHCR from production runner
+    if: ${{ inputs.diagnose_network }}
+    runs-on: [self-hosted, linux, production, docker, bcn-org]
+    timeout-minutes: 8
+    steps:
+      - name: Inspect network and Docker storage
+        run: |
+          date -u
+          getent ahostsv4 pkg-containers.githubusercontent.com | awk '!seen[$1]++ {print $1}'
+          ip route get 185.199.108.154
+          df -h /var/lib/docker
+          docker system df
+          curl -4 -sS -o /dev/null -w 'GHCR HTTP %{http_code}, connect %{time_connect}s, total %{time_total}s\n' --connect-timeout 10 --max-time 25 https://ghcr.io/v2/
+          curl -4 -sS -o /dev/null -w 'CDN HTTP %{http_code}, connect %{time_connect}s, total %{time_total}s\n' --connect-timeout 10 --max-time 25 https://pkg-containers.githubusercontent.com/
+
+      - name: Test each image download without restarting services
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          set +e
+          timeout 120s docker pull ghcr.io/bcn-org/bcn_profiles:7693a220e8b73d9b29f80eeeea60374859bf2875
+          echo "backend pull exit: $?"
+          timeout 120s docker pull ghcr.io/bcn-org/bcn_profiles-web:7693a220e8b73d9b29f80eeeea60374859bf2875
+          echo "frontend pull exit: $?"
