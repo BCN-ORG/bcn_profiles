@@ -1,6 +1,8 @@
 node_modules
 .next
+.next-dev
 .git
 *.md
 .env*
 !.env.example
+tsconfig.tsbuildinfo

@@ -9,6 +9,9 @@ coverage
 .git
 .github
 .code-review-graph
+docs
+secrets
+*.pem
 *.log
 .DS_Store
 test
