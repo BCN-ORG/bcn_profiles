@@ -7,8 +7,12 @@ import {
   MinLength,
   MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class RegisterDto {
+  @Transform(({ value }): unknown =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail({}, { message: 'Email không hợp lệ' })
   @IsNotEmpty({ message: 'Email không được để trống' })
   email!: string;
@@ -25,6 +29,9 @@ export class RegisterDto {
   fullName!: string;
 
   @IsString({ message: 'Số điện thoại phải là chuỗi' })
+  @Transform(({ value }): unknown =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
   @Matches(/^(\+84|0)(3[2-9]|5[25689]|7[06-9]|8[0-9]|9[0-9])[0-9]{7}$/, {
     message: 'Số điện thoại không hợp lệ (VD: 0912345678 hoặc +84912345678)',

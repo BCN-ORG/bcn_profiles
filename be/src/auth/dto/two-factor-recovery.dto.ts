@@ -5,15 +5,22 @@ import {
   Length,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 // Step 1: Request recovery
 export class TwoFactorRecoveryRequestDto {
+  @Transform(({ value }): unknown =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   email: string;
 }
 
 // Step 2: Verify recovery email (user receives OTP in email)
 export class VerifyRecoveryEmailDto {
+  @Transform(({ value }): unknown =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   email: string;
 

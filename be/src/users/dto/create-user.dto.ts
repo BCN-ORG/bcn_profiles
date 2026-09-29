@@ -11,6 +11,9 @@ import { Transform, Type } from 'class-transformer';
 import { UserMetadataDto } from './user-metadata.dto';
 
 export class CreateUserDto {
+  @Transform(({ value }): unknown =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail({}, { message: 'Email không hợp lệ' })
   @IsNotEmpty({ message: 'Email không được để trống' })
   @Matches(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, {
