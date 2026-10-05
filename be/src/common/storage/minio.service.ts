@@ -93,7 +93,13 @@ export class MinioService implements OnModuleInit {
       );
       this.logger.log(`Created MinIO bucket "${this.bucket}"`);
     }
-    await this.ensureAvatarPublicReadPolicy(client);
+    try {
+      await this.ensureAvatarPublicReadPolicy(client);
+    } catch (error) {
+      this.logger.warn(
+        `MinIO public-read policy skipped: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     try {
       await this.ensureBrowserCors(client);
     } catch (error) {
@@ -180,6 +186,9 @@ ${allowedOrigins}
       ],
     };
     await client.setBucketPolicy(this.bucket, JSON.stringify(policy));
+    this.logger.log(
+      `Applied MinIO public GetObject for ${folder} on bucket "${this.bucket}"`,
+    );
   }
 
   private ensureConfigured(): Client {

@@ -58,6 +58,33 @@ describe('MinioService', () => {
     ).not.toThrow();
   });
 
+  it('continues bucket setup when public-read policy is denied', async () => {
+    const service = new MinioService();
+    const client = (
+      service as unknown as {
+        client: {
+          bucketExists: jest.Mock;
+          setBucketPolicy: jest.Mock;
+          makeRequestAsyncOmit: jest.Mock;
+        };
+      }
+    ).client;
+    client.bucketExists = jest.fn().mockResolvedValue(true);
+    client.setBucketPolicy = jest
+      .fn()
+      .mockRejectedValue(new Error('Access Denied'));
+    client.makeRequestAsyncOmit = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      (
+        service as unknown as {
+          ensureBucketReady: () => Promise<void>;
+        }
+      ).ensureBucketReady(),
+    ).resolves.toBeUndefined();
+    expect(client.makeRequestAsyncOmit).toHaveBeenCalled();
+  });
+
   it('checks file uploads against the server object size, allowing non-image types', async () => {
     const service = new MinioService();
     const client = (service as unknown as { client: { statObject: jest.Mock } })
