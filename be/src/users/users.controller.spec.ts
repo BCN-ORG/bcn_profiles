@@ -21,10 +21,14 @@ describe('UsersController', () => {
   });
 
   it('marks GET /users/me/profile as uncacheable', () => {
-    const headers = Reflect.getMetadata(
-      HEADERS_METADATA,
-      UsersController.prototype.getMyProfile,
-    ) as Array<{ name: string; value: string }>;
+    const handler = Object.getOwnPropertyDescriptor(
+      UsersController.prototype,
+      'getMyProfile',
+    )?.value as object;
+    const headers = Reflect.getMetadata(HEADERS_METADATA, handler) as Array<{
+      name: string;
+      value: string;
+    }>;
 
     expect(headers).toEqual(
       expect.arrayContaining([

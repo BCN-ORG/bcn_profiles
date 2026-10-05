@@ -76,10 +76,14 @@ describe('GET /auth/me cache policy', () => {
   });
 
   it('returns the same cache policy for GET /auth/profile', () => {
-    const headers = Reflect.getMetadata(
-      HEADERS_METADATA,
-      AuthController.prototype.getProfile,
-    ) as Array<{ name: string; value: string }>;
+    const handler = Object.getOwnPropertyDescriptor(
+      AuthController.prototype,
+      'getProfile',
+    )?.value as object;
+    const headers = Reflect.getMetadata(HEADERS_METADATA, handler) as Array<{
+      name: string;
+      value: string;
+    }>;
 
     expect(headers).toEqual(
       expect.arrayContaining([
@@ -87,5 +91,4 @@ describe('GET /auth/me cache policy', () => {
       ]),
     );
   });
-
 });
