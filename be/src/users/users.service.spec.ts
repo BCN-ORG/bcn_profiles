@@ -155,6 +155,22 @@ describe('UsersService avatar behavior', () => {
     );
     expect(minio.deleteImage).toHaveBeenCalledWith(oldPublicId);
   });
+
+  it('preserves omitted phone and clears explicit null phone', async () => {
+    await service.updateUser(userId, { fullName: 'Renamed' });
+    expect(prisma.user.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ phone: expect.anything() }),
+      }),
+    );
+
+    await service.updateUser(userId, { phone: null });
+    expect(prisma.user.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ phone: null }),
+      }),
+    );
+  });
 });
 
 describe('UsersService deleteUser', () => {

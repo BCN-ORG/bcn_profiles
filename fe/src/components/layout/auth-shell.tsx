@@ -39,9 +39,14 @@ export function AuthShell({
         {/* Desktop product story */}
         <section className="hidden flex-col justify-center px-6 py-16 lg:flex lg:px-0 lg:py-20">
           <div className="animate-enter mb-10 flex items-center gap-3">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-success font-bold text-success-foreground shadow-sm">
-              B
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/bcn-card-back.webp"
+              alt="BCN"
+              width={44}
+              height={44}
+              className="size-11 shrink-0 rounded-xl object-cover ring-1 ring-border/80"
+            />
             <div>
               <p className="text-lg font-semibold tracking-tight">BCN</p>
               <p className="text-sm text-muted-foreground">Account Center</p>
@@ -81,9 +86,14 @@ export function AuthShell({
         <div className="flex flex-col justify-center px-4 py-16 sm:px-6 lg:px-0 lg:py-24">
           {/* Mobile brand */}
           <div className="animate-enter mb-8 flex items-center gap-3 lg:hidden">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-success font-bold text-success-foreground">
-              B
-            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/bcn-card-back.webp"
+              alt="BCN"
+              width={40}
+              height={40}
+              className="size-10 shrink-0 rounded-lg object-cover ring-1 ring-border/80"
+            />
             <div>
               <p className="font-semibold">BCN Account</p>
               <p className="text-xs text-muted-foreground">{tb('name')}</p>

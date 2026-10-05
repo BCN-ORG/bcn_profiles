@@ -7,6 +7,24 @@ export type AvatarUploadSignature = {
   publicId: string;
 };
 
+export type UploadStage = 'signature' | 'storage' | 'confirm';
+
+export class UploadStageError extends Error {
+  constructor(
+    readonly stage: UploadStage,
+    message: string,
+    readonly details: {
+      status?: number;
+      code?: string;
+      requestId?: string;
+      fileSize?: number;
+      mime?: string;
+    } = {},
+  ) {
+    super(message);
+  }
+}
+
 export async function putAvatarFile(
   file: File,
   signature: AvatarUploadSignature,
@@ -31,6 +49,33 @@ export async function putAvatarFile(
     body: file,
   });
   if (!put.ok) {
-    throw new Error(`${uploadFailedMessage} (${put.status})`);
+    const storage = await readStorageError(put);
+    throw new UploadStageError('storage', `${uploadFailedMessage} (${put.status})`, {
+      status: put.status,
+      code: storage.code,
+      requestId: storage.requestId,
+      fileSize: file.size,
+      mime: file.type || 'application/octet-stream',
+    });
   }
+}
+
+export function logUploadStageError(error: unknown) {
+  if (!(error instanceof UploadStageError)) return;
+  console.warn('avatar_upload_failed', {
+    stage: error.stage,
+    ...error.details,
+  });
+}
+
+async function readStorageError(response: Response) {
+  const text = await response.text().catch(() => '');
+  return {
+    code: text.match(/<Code>([^<]+)<\/Code>/)?.[1],
+    requestId:
+      text.match(/<RequestId>([^<]+)<\/RequestId>/)?.[1] ||
+      response.headers.get('x-amz-request-id') ||
+      response.headers.get('x-request-id') ||
+      undefined,
+  };
 }

@@ -23,6 +23,14 @@ import { useAuth } from '@/components/auth/auth-provider';
 import { useTheme } from '@/components/theme/theme-provider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -166,91 +174,85 @@ function AccountUserMenu({
   }
 
   return (
-    <div className="group relative">
-      <button
-        type="button"
-        className="flex size-11 cursor-pointer items-center justify-center rounded-xl outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
-        aria-haspopup="menu"
-        aria-label={name}
-      >
-        <Avatar size="lg" className="size-11 rounded-xl after:rounded-xl">
-          {avatar ? (
-            <AvatarImage src={avatar} alt="" className="rounded-xl" />
-          ) : null}
-          <AvatarFallback className="rounded-xl bg-primary/12 text-sm font-semibold text-primary">
-            {initials(name)}
-          </AvatarFallback>
-        </Avatar>
-      </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex size-11 cursor-pointer items-center justify-center rounded-xl outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring"
+          aria-haspopup="menu"
+          aria-label={name}
+        >
+          <Avatar size="lg" className="size-11 rounded-xl after:rounded-xl">
+            {avatar ? (
+              <AvatarImage src={avatar} alt="" className="rounded-xl" />
+            ) : null}
+            <AvatarFallback className="rounded-xl bg-primary/12 text-sm font-semibold text-primary">
+              {initials(name)}
+            </AvatarFallback>
+          </Avatar>
+        </button>
+      </DropdownMenuTrigger>
 
-      <div
-        role="menu"
-        className={cn(
-          'invisible absolute top-full right-0 z-50 w-56 pt-2 opacity-0 transition-[opacity,visibility] duration-150 ease-premium',
-          'pointer-events-none group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100',
-          'group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100',
-        )}
-      >
-        <div className="overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-card ring-1 ring-foreground/5">
-          <div className="border-b border-border px-3 py-2.5">
-            <p className="truncate text-sm font-medium">{name}</p>
-            <p className="truncate text-xs text-muted-foreground">{email}</p>
-          </div>
+      <DropdownMenuContent align="end" className="w-56 rounded-xl p-0">
+        <DropdownMenuLabel className="border-b border-border px-3 py-2.5">
+          <p className="truncate text-sm font-medium">{name}</p>
+          <p className="truncate text-xs text-muted-foreground">{email}</p>
+        </DropdownMenuLabel>
 
-          <div className="p-1.5">
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-              onClick={() => setTheme(isDark ? 'light' : 'dark')}
-            >
-              {isDark ? (
-                <Sun className="size-4 text-primary" aria-hidden />
-              ) : (
-                <Moon className="size-4 text-primary" aria-hidden />
-              )}
-              {isDark ? tc('themeLight') : tc('themeDark')}
-            </button>
+        <div className="p-1.5">
+          <DropdownMenuItem
+            className="min-h-10 cursor-pointer gap-2 rounded-lg px-2.5"
+            onSelect={() => setTheme(isDark ? 'light' : 'dark')}
+          >
+            {isDark ? (
+              <Sun className="size-4 text-primary" aria-hidden />
+            ) : (
+              <Moon className="size-4 text-primary" aria-hidden />
+            )}
+            {isDark ? tc('themeLight') : tc('themeDark')}
+          </DropdownMenuItem>
 
-            <div className="mt-1 rounded-lg px-2.5 py-2">
-              <p className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                {tc('language')}
-              </p>
-              <div className="flex gap-1">
-                {(['vi', 'en'] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    disabled={pending}
-                    className={cn(
-                      'h-7 flex-1 cursor-pointer rounded-full text-[11px] font-semibold tracking-wide transition-colors',
-                      locale === item
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    )}
-                    onClick={() => switchLocale(item)}
-                  >
-                    {item.toUpperCase()}
-                  </button>
-                ))}
-              </div>
+          <div className="mt-1 rounded-lg px-2.5 py-2">
+            <p className="mb-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              {tc('language')}
+            </p>
+            <div className="flex gap-1">
+              {(['vi', 'en'] as const).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  disabled={pending}
+                  className={cn(
+                    'h-7 flex-1 cursor-pointer rounded-full text-[11px] font-semibold tracking-wide transition-colors',
+                    locale === item
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    switchLocale(item);
+                  }}
+                >
+                  {item.toUpperCase()}
+                </button>
+              ))}
             </div>
           </div>
-
-          <div className="border-t border-border p-1.5">
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
-              onClick={onLogout}
-            >
-              <LogOut className="size-4" aria-hidden />
-              {tc('logout')}
-            </button>
-          </div>
         </div>
-      </div>
-    </div>
+
+        <DropdownMenuSeparator />
+        <div className="p-1.5">
+          <DropdownMenuItem
+            variant="destructive"
+            className="min-h-10 cursor-pointer gap-2 rounded-lg px-2.5"
+            onSelect={onLogout}
+          >
+            <LogOut className="size-4" aria-hidden />
+            {tc('logout')}
+          </DropdownMenuItem>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

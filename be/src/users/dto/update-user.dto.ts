@@ -34,9 +34,9 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString({ message: 'Số điện thoại phải là chuỗi' })
   @Transform(({ value }): unknown =>
-    typeof value === 'string' ? value.trim() || undefined : (value as unknown),
+    typeof value === 'string' ? value.trim() || null : (value as unknown),
   )
-  phone?: string;
+  phone?: string | null;
 
   @IsOptional()
   @IsObject()

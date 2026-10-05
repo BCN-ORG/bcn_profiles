@@ -8,7 +8,11 @@ import { ExternalLink } from "lucide-react";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useStatusLabel } from "@/hooks/use-status-label";
 import { Button, PageHeader, Skeleton } from "@/components/ui/primitives";
-import { putAvatarFile } from "@/lib/avatar-upload";
+import {
+  UploadStageError,
+  logUploadStageError,
+  putAvatarFile,
+} from "@/lib/avatar-upload";
 import { authService, profileService } from "@/services";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -84,7 +88,12 @@ export default function AccountPage() {
     if (!file) return;
     setAvatarBusy(true);
     try {
-      const sig = await profileService.avatarSignature();
+      const sig = await profileService.avatarSignature().catch((error) => {
+        throw new UploadStageError(
+          "signature",
+          error instanceof Error ? error.message : t("avatarFail"),
+        );
+      });
       const maxMb = (sig.maxBytes / 1024 / 1024).toFixed(1);
       await putAvatarFile(
         file,
@@ -93,14 +102,22 @@ export default function AccountPage() {
         t("avatarTooLarge", { maxMb }),
         t("avatarFail"),
       );
-      const updated = await profileService.setAvatar(
-        sig.secureUrl,
-        sig.publicId,
-      );
+      const updated = await profileService
+        .setAvatar(sig.secureUrl, sig.publicId)
+        .catch((error) => {
+          throw new UploadStageError(
+            "confirm",
+            error instanceof Error
+              ? `${t("avatarFail")}: ${error.message}`
+              : t("avatarFail"),
+            { fileSize: file.size, mime: file.type },
+          );
+        });
       setUser(updated);
       await refresh();
       toast.success(t("avatarOk"));
     } catch (error) {
+      logUploadStageError(error);
       toast.error(error instanceof Error ? error.message : tc("error"));
     } finally {
       setAvatarBusy(false);
@@ -190,7 +207,11 @@ export default function AccountPage() {
                   accept="image/*"
                   hidden
                   disabled={avatarBusy}
-                  onChange={(e) => void onAvatar(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    e.currentTarget.value = "";
+                    void onAvatar(file);
+                  }}
                 />
               </label>
             </Button>
