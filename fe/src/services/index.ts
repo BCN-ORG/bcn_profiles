@@ -3,6 +3,7 @@ import type {
   AuditLog,
   Identity,
   MembershipStatus,
+  ProfileUser,
   User,
   UserApplication,
   UserSession,
@@ -109,13 +110,18 @@ export const authService = {
 
 export const profileService = {
   completeOnboarding: () => request.post("/auth/complete-onboarding"),
+  getMe: () =>
+    request.get<{ users: ProfileUser }>("/users/me").then((r) => r.users),
   update: (data: {
     fullName?: string;
     phone?: string;
     avatar?: string | null;
     avatarPublicId?: string | null;
     metadata?: NonNullable<User["metadata"]>;
-  }) => request.patch<{ users: User }>("/users/me", data).then((r) => r.users),
+  }) =>
+    request
+      .patch<{ users: ProfileUser }>("/users/me", data)
+      .then((r) => r.users),
   publicProfile: (id: string) =>
     request
       .get<{ user: PublicProfile }>(`/users/${encodeURIComponent(id)}/profile`)
@@ -131,14 +137,14 @@ export const profileService = {
     }>("/users/me/avatar/upload-signature", {}),
   setAvatar: (avatar: string, avatarPublicId: string) =>
     request
-      .patch<{ users: User }>("/users/me/avatar", {
+      .patch<{ users: ProfileUser }>("/users/me/avatar", {
         avatar,
         avatarPublicId,
       })
       .then((r) => r.users),
   clearAvatar: () =>
     request
-      .delete<{ users: User }>("/users/me/avatar")
+      .delete<{ users: ProfileUser }>("/users/me/avatar")
       .then((r) => r.users),
 };
 

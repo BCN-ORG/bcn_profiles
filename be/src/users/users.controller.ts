@@ -86,6 +86,15 @@ export class UsersController {
   }
 
   // Must be registered before parameterized ":id" routes.
+  // Editable profile from the database. Distinct from GET /auth/me.
+  @Get('me')
+  @Header('Cache-Control', 'no-store, private')
+  @Roles(Role.USER, Role.ADMIN)
+  async getMe(@User() currentUser: { id: string }) {
+    const user = await this.usersService.findOne(currentUser.id);
+    return { users: user };
+  }
+
   @Get('me/profile')
   @Header('Cache-Control', 'no-store, private')
   async getMyProfile(@User() user: any) {

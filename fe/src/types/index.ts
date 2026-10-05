@@ -42,6 +42,17 @@ export type User = {
     website?: string;
     [key: string]: unknown;
   } | null;
+  updatedAt?: string;
+};
+
+/** Session user from GET /auth/me. Not the editable profile. */
+export type AuthUser = User;
+
+/** Editable profile from GET /users/me. */
+export type ProfileUser = User & {
+  phone?: string | null;
+  googleId?: string | null;
+  typeAuth?: string | null;
 };
 
 export type PublicProfile = {

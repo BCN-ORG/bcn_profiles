@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { ExternalLink } from "lucide-react";
@@ -22,6 +23,7 @@ import { OtpCountdown } from "@/components/auth/otp-countdown";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "@/i18n/navigation";
 import { initials } from "@/lib/utils";
+import type { ProfileUser } from "@/types";
 
 const ProfileArtifact3D = dynamic(
   () => import("@/components/profile/profile-artifact-3d"),
@@ -38,16 +40,22 @@ export default function AccountPage() {
   const tc = useTranslations("common");
   const t3d = useTranslations("publicProfile");
   const label = useStatusLabel();
+  const queryClient = useQueryClient();
   const { user, refresh, setUser } = useAuth();
-  const [fullName, setFullName] = useState(user?.fullName || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [bio, setBio] = useState(user?.metadata?.bio || "");
-  const [github, setGithub] = useState(user?.metadata?.github || "");
-  const [linkedin, setLinkedin] = useState(user?.metadata?.linkedin || "");
-  const [website, setWebsite] = useState(user?.metadata?.website || "");
-  const [profile3dEnabled, setProfile3dEnabled] = useState(
-    user?.metadata?.profile3dEnabled !== false,
-  );
+  const profileQuery = useQuery({
+    queryKey: ["profile-me"],
+    queryFn: () => profileService.getMe(),
+    enabled: Boolean(user),
+  });
+  const profile = profileQuery.data;
+  const [formReady, setFormReady] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [bio, setBio] = useState("");
+  const [github, setGithub] = useState("");
+  const [linkedin, setLinkedin] = useState("");
+  const [website, setWebsite] = useState("");
+  const [profile3dEnabled, setProfile3dEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
   const [newEmail, setNewEmail] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
@@ -55,18 +63,61 @@ export default function AccountPage() {
   const [emailOtpSentAt, setEmailOtpSentAt] = useState<number | null>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
 
+  useEffect(() => {
+    if (!profile || formReady) return;
+    setFullName(profile.fullName ?? "");
+    setPhone(profile.phone ?? "");
+    setBio(profile.metadata?.bio ?? "");
+    setGithub(profile.metadata?.github ?? "");
+    setLinkedin(profile.metadata?.linkedin ?? "");
+    setWebsite(profile.metadata?.website ?? "");
+    setProfile3dEnabled(profile.metadata?.profile3dEnabled !== false);
+    setFormReady(true);
+  }, [profile, formReady]);
+
+  function applyProfile(updated: ProfileUser) {
+    queryClient.setQueryData(["profile-me"], updated);
+    if (!user) return;
+    setUser({
+      ...user,
+      fullName: updated.fullName ?? user.fullName,
+      avatar: updated.avatar || undefined,
+      metadata: updated.metadata ?? user.metadata,
+      updatedAt: updated.updatedAt ?? user.updatedAt,
+    });
+  }
+
   if (!user) return null;
 
-  const name = user.fullName || user.email;
+  if (profileQuery.isError) {
+    return (
+      <PageShell>
+        <p className="text-sm text-destructive">{tc("error")}</p>
+      </PageShell>
+    );
+  }
+
+  if (!profile || !formReady) {
+    return (
+      <PageShell>
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full rounded-xl" />
+      </PageShell>
+    );
+  }
+
+  const account = profile;
+  const name = account.fullName || account.email;
   const profileInitials = initials(name);
+  const avatarUrl = account.avatar || undefined;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     try {
-      await profileService.update({
+      const updated = await profileService.update({
         fullName,
-        phone,
+        ...(phone !== (account.phone ?? "") ? { phone } : {}),
         metadata: {
           bio: bio.trim(),
           github: github.trim(),
@@ -75,7 +126,8 @@ export default function AccountPage() {
           profile3dEnabled,
         },
       });
-      await refresh();
+      applyProfile(updated);
+      setPhone(updated.phone ?? "");
       toast.success(tc("save"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tc("error"));
@@ -113,7 +165,7 @@ export default function AccountPage() {
             { fileSize: file.size, mime: file.type },
           );
         });
-      setUser(updated);
+      applyProfile(updated);
       toast.success(t("avatarOk"));
     } catch (error) {
       logUploadStageError(error);
@@ -159,6 +211,9 @@ export default function AccountPage() {
       setNewEmail("");
       setEmailOtp("");
       setEmailOtpSentAt(null);
+      queryClient.setQueryData<ProfileUser>(["profile-me"], (current) =>
+        current ? { ...current, email: newEmail } : current,
+      );
       await refresh();
       toast.success(t("emailChanged"));
     } catch (error) {
@@ -174,7 +229,7 @@ export default function AccountPage() {
         title={t("title")}
         actions={
           <Button asChild variant="outline">
-            <Link href={`/profile/${user.id}`}>
+            <Link href={`/profile/${account.id}`}>
               {t("viewPublicProfile")}
               <ExternalLink className="size-4" aria-hidden />
             </Link>
@@ -189,7 +244,7 @@ export default function AccountPage() {
         <CardContent className="grid gap-4 sm:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)] sm:items-start">
           <ProfileArtifact3D
             initials={profileInitials}
-            avatarUrl={user.avatar}
+            avatarUrl={avatarUrl}
             label={t3d("artifactLabel", { name })}
             rotateLeftLabel={t3d("rotateLeft")}
             rotateRightLabel={t3d("rotateRight")}
@@ -214,7 +269,7 @@ export default function AccountPage() {
                 />
               </label>
             </Button>
-            {user.avatar ? (
+            {avatarUrl ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -223,7 +278,7 @@ export default function AccountPage() {
                   void profileService
                     .clearAvatar()
                     .then((updated) => {
-                      setUser(updated);
+                      applyProfile(updated);
                       toast.success(t("avatarCleared"));
                     })
                     .catch((e: Error) => toast.error(e.message))
@@ -248,7 +303,7 @@ export default function AccountPage() {
             </div>
             <div className="space-y-2">
               <Label>{t("email")}</Label>
-              <Input value={user.email} disabled />
+              <Input value={account.email} disabled />
             </div>
             <div className="space-y-2">
               <Label>{t("phone")}</Label>
@@ -256,20 +311,20 @@ export default function AccountPage() {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{t("role")}</span>
-              <strong>{label(user.role)}</strong>
+              <strong>{label(account.role)}</strong>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{t("status")}</span>
-              <strong>{label(user.status || "ACTIVE")}</strong>
+              <strong>{label(account.status || "ACTIVE")}</strong>
             </div>
-            {user.metadata?.cohort || user.metadata?.communityRole ? (
+            {account.metadata?.cohort || account.metadata?.communityRole ? (
               <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-4 md:col-span-2 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">
                     {t("cohort")}
                   </p>
                   <p className="mt-1 font-medium">
-                    {user.metadata?.cohort || "-"}
+                    {account.metadata?.cohort || "-"}
                   </p>
                 </div>
                 <div>
@@ -277,7 +332,7 @@ export default function AccountPage() {
                     {t("communityRole")}
                   </p>
                   <p className="mt-1 font-medium">
-                    {user.metadata?.communityRole || "-"}
+                    {account.metadata?.communityRole || "-"}
                   </p>
                 </div>
               </div>

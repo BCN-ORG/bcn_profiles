@@ -37,6 +37,36 @@ describe('UsersController', () => {
     );
   });
 
+  it('returns the database profile for GET /users/me', async () => {
+    const users = {
+      id: '24160',
+      phone: '0353133235',
+      email: 'user@example.test',
+    };
+    const findOne = jest.fn().mockResolvedValue(users);
+    const current = new UsersController({ findOne } as never);
+
+    await expect(current.getMe({ id: '24160' })).resolves.toEqual({ users });
+    expect(findOne).toHaveBeenCalledWith('24160');
+  });
+
+  it('marks GET /users/me as uncacheable', () => {
+    const handler = Object.getOwnPropertyDescriptor(
+      UsersController.prototype,
+      'getMe',
+    )?.value as object;
+    const headers = Reflect.getMetadata(HEADERS_METADATA, handler) as Array<{
+      name: string;
+      value: string;
+    }>;
+
+    expect(headers).toEqual(
+      expect.arrayContaining([
+        { name: 'Cache-Control', value: 'no-store, private' },
+      ]),
+    );
+  });
+
   it('exposes GET :id/profile without a user session', () => {
     const handler = Object.getOwnPropertyDescriptor(
       UsersController.prototype,
