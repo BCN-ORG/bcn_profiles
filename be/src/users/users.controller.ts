@@ -4,6 +4,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -86,6 +87,7 @@ export class UsersController {
 
   // Must be registered before parameterized ":id" routes.
   @Get('me/profile')
+  @Header('Cache-Control', 'no-store, private')
   async getMyProfile(@User() user: any) {
     return {
       user: user,

@@ -114,7 +114,6 @@ export default function AccountPage() {
           );
         });
       setUser(updated);
-      await refresh();
       toast.success(t("avatarOk"));
     } catch (error) {
       logUploadStageError(error);
@@ -223,8 +222,8 @@ export default function AccountPage() {
                 onClick={() =>
                   void profileService
                     .clearAvatar()
-                    .then(async () => {
-                      await refresh();
+                    .then((updated) => {
+                      setUser(updated);
                       toast.success(t("avatarCleared"));
                     })
                     .catch((e: Error) => toast.error(e.message))

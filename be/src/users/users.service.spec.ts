@@ -33,6 +33,7 @@ describe('UsersService avatar behavior', () => {
     createUploadSignature: jest.Mock;
   };
   let service: UsersService;
+  let sessionCache: { invalidateUser: jest.Mock };
 
   beforeEach(() => {
     process.env.MINIO_AVATAR_FOLDER = 'user-avatars';
@@ -57,10 +58,14 @@ describe('UsersService avatar behavior', () => {
       createUploadSignature: jest.fn().mockReturnValue({ signature: 'signed' }),
     };
 
+    sessionCache = {
+      invalidateUser: jest.fn().mockResolvedValue(undefined),
+    };
+
     service = new UsersService(
       prisma as never,
       {} as never,
-      { invalidateUser: jest.fn() } as never,
+      sessionCache as never,
       { invalidateAll: jest.fn() } as never,
       minio as never,
       { delByPrefix: jest.fn() } as never,
@@ -154,6 +159,38 @@ describe('UsersService avatar behavior', () => {
       }),
     );
     expect(minio.deleteImage).toHaveBeenCalledWith(oldPublicId);
+  });
+
+  it('invalidates the auth-user cache after the database update', async () => {
+    const publicId = 'user-avatars/user-1/new-avatar';
+    await service.setAvatar(userId, {
+      avatar: `https://storage.example.test/profiles/${publicId}`,
+      avatarPublicId: publicId,
+    });
+
+    expect(sessionCache.invalidateUser).toHaveBeenCalledWith(userId);
+    expect(prisma.user.update.mock.invocationCallOrder[0]).toBeLessThan(
+      sessionCache.invalidateUser.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('returns the cleared user and invalidates the auth-user cache', async () => {
+    const updated = await service.clearAvatar(userId);
+
+    expect(updated.avatar).toBeNull();
+    expect(sessionCache.invalidateUser).toHaveBeenCalledWith(userId);
+    expect(prisma.user.update.mock.invocationCallOrder[0]).toBeLessThan(
+      sessionCache.invalidateUser.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('propagates auth-user cache invalidation failure after the database update', async () => {
+    sessionCache.invalidateUser.mockRejectedValue(new Error('redis down'));
+
+    await expect(
+      service.updateUser(userId, { fullName: 'Renamed' }),
+    ).rejects.toThrow('redis down');
+    expect(prisma.user.update).toHaveBeenCalled();
   });
 
   it('preserves omitted phone and clears explicit null phone', async () => {

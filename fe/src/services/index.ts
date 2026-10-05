@@ -136,7 +136,10 @@ export const profileService = {
         avatarPublicId,
       })
       .then((r) => r.users),
-  clearAvatar: () => request.delete<{ users: User }>("/users/me/avatar"),
+  clearAvatar: () =>
+    request
+      .delete<{ users: User }>("/users/me/avatar")
+      .then((r) => r.users),
 };
 
 export const identityService = {

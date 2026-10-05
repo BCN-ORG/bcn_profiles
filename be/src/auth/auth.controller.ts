@@ -3,6 +3,7 @@ import {
   Post,
   Body,
   Get,
+  Header,
   UseGuards,
   Res,
   HttpCode,
@@ -134,6 +135,7 @@ export class AuthController {
   }
 
   @Get('profile')
+  @Header('Cache-Control', 'no-store, private')
   async getProfile(@User() user: any) {
     // User already resolved by JwtStrategy (JWT claims / cache) — avoid an extra DB round-trip.
     return user;
@@ -141,6 +143,7 @@ export class AuthController {
 
   @Get('me')
   @SkipThrottle()
+  @Header('Cache-Control', 'no-store, private')
   async getMe(@User() user: any) {
     return { user };
   }
