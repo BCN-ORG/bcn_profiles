@@ -38,7 +38,18 @@ describe('TimelineEventsService.recordFromApplication', () => {
           .fn()
           .mockImplementation(({ data }) => ({ id: 11, ...data })),
       },
-      user: { findUnique: jest.fn().mockResolvedValue({ id: 'user-1' }) },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'user-1' }),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'user-1',
+            fullName: 'Nguyễn Văn Minh',
+            email: 'minh@example.test',
+            avatar: null,
+          },
+        ]),
+        count: jest.fn().mockResolvedValue(1),
+      },
       authAuditLog: { create: jest.fn() },
     };
     const service = new TimelineEventsService(
@@ -135,5 +146,71 @@ describe('TimelineEventsService.recordFromApplication', () => {
     await expect(
       service.recordFromApplication(basic(), dto),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it.each([
+    ['Nguyễn Văn Minh', 'Nguyễn Văn Minh'],
+    ['Nguyễn', 'Nguyễn'],
+    ['minh', 'minh'],
+    ['Văn Minh', 'Văn Minh'],
+    ['  MINH  ', 'MINH'],
+  ])('searches active full names for %s', async (query, normalized) => {
+    const { service, prisma } = setup();
+    await expect(
+      service.searchUsersFromApplication(basic(), query, '2'),
+    ).resolves.toMatchObject({ users: [{ id: 'user-1' }], total: 1 });
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: 'ACTIVE',
+          fullName: { contains: normalized, mode: 'insensitive' },
+        },
+        skip: 100,
+        take: 100,
+      }),
+    );
+    await expect(
+      service.searchUsersFromApplication(undefined, 'Minh'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('does not search by user ID or email', async () => {
+    const { service, prisma } = setup();
+    prisma.user.findMany.mockResolvedValue([]);
+    prisma.user.count.mockResolvedValue(0);
+    await expect(
+      service.searchUsersFromApplication(basic(), 'user-1'),
+    ).resolves.toEqual({ users: [], total: 0 });
+    expect(prisma.user.findMany.mock.calls[0][0].where).toEqual({
+      status: 'ACTIVE',
+      fullName: { contains: 'user-1', mode: 'insensitive' },
+    });
+  });
+
+  it('lists only Quiz users with read permission for reminders', async () => {
+    const { service, prisma } = setup();
+    await expect(
+      service.eligibleUsersFromApplication(basic()),
+    ).resolves.toEqual({ userIds: ['user-1'], total: 1 });
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'ACTIVE',
+          applicationRoles: {
+            some: {
+              applicationId: 'app-quiz',
+              role: {
+                permissions: {
+                  some: { permission: { code: 'quiz.question.read' } },
+                },
+              },
+            },
+          },
+          applicationAccess: {
+            none: { applicationId: 'app-quiz', status: 'BLOCKED' },
+          },
+        }),
+      }),
+    );
   });
 });

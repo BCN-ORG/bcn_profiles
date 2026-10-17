@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
   Logger,
   OnModuleInit,
 } from '@nestjs/common';
@@ -192,6 +193,85 @@ export class TimelineEventsService implements OnModuleInit {
         avatarUrl: user.avatar,
       })),
     };
+  }
+
+  async searchUsersFromApplication(
+    authorization: string | undefined,
+    query?: string,
+    pageRaw?: string,
+  ) {
+    await this.authenticateApplication(authorization);
+    const q = query?.trim() ?? '';
+    if (q.length > 100) throw new BadRequestException('q is too long');
+    const page = this.internalPage(pageRaw);
+    if (!q) return { users: [], total: 0 };
+    const where = {
+      status: 'ACTIVE' as const,
+      fullName: { contains: q, mode: 'insensitive' as const },
+    };
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: { id: true, fullName: true, email: true, avatar: true },
+        orderBy: { id: 'asc' },
+        skip: (page - 1) * 100,
+        take: 100,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return {
+      users: users.map((user) => ({
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        avatarUrl: user.avatar,
+      })),
+      total,
+    };
+  }
+
+  async eligibleUsersFromApplication(
+    authorization: string | undefined,
+    pageRaw?: string,
+  ) {
+    const app = await this.authenticateApplication(authorization);
+    if (app.code !== 'QUIZ') throw new ForbiddenException('QUIZ only');
+    const page = this.internalPage(pageRaw);
+    const where = {
+      status: 'ACTIVE' as const,
+      applicationRoles: {
+        some: {
+          applicationId: app.id,
+          role: {
+            permissions: {
+              some: { permission: { code: 'quiz.question.read' } },
+            },
+          },
+        },
+      },
+      applicationAccess: {
+        none: { applicationId: app.id, status: 'BLOCKED' as const },
+      },
+    };
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: { id: true },
+        orderBy: { id: 'asc' },
+        skip: (page - 1) * 100,
+        take: 100,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return { userIds: users.map((user) => user.id), total };
+  }
+
+  private internalPage(raw?: string): number {
+    const page = raw === undefined ? 1 : Number(raw);
+    if (!Number.isInteger(page) || page < 1 || page > 100_000) {
+      throw new BadRequestException('Invalid page');
+    }
+    return page;
   }
 
   private async authenticateApplication(header: string | undefined) {

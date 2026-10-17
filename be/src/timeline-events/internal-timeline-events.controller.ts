@@ -25,4 +25,30 @@ export class InternalTimelineEventsController {
   ) {
     return this.timelineEventsService.lookupUsersFromApplication(header, ids);
   }
+
+  @Public()
+  @Get('users/search')
+  searchUsers(
+    @Headers('authorization') header: string | undefined,
+    @Query('q') query?: string,
+    @Query('page') page?: string,
+  ) {
+    return this.timelineEventsService.searchUsersFromApplication(
+      header,
+      query,
+      page,
+    );
+  }
+
+  @Public()
+  @Get('users/eligible')
+  eligibleUsers(
+    @Headers('authorization') header: string | undefined,
+    @Query('page') page?: string,
+  ) {
+    return this.timelineEventsService.eligibleUsersFromApplication(
+      header,
+      page,
+    );
+  }
 }
