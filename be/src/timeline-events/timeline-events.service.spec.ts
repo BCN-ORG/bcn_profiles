@@ -158,7 +158,7 @@ describe('TimelineEventsService.recordFromApplication', () => {
     const { service, prisma } = setup();
     await expect(
       service.searchUsersFromApplication(basic(), query, '2'),
-    ).resolves.toMatchObject({ users: [{ id: 'user-1' }], total: 1 });
+    ).resolves.toEqual({ users: [{ id: 'user-1' }], total: 1 });
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -167,6 +167,7 @@ describe('TimelineEventsService.recordFromApplication', () => {
         },
         skip: 100,
         take: 100,
+        select: { id: true },
       }),
     );
     await expect(

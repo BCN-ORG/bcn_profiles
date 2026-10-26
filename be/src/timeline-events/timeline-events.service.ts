@@ -212,22 +212,14 @@ export class TimelineEventsService implements OnModuleInit {
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        select: { id: true, fullName: true, email: true, avatar: true },
+        select: { id: true },
         orderBy: { id: 'asc' },
         skip: (page - 1) * 100,
         take: 100,
       }),
       this.prisma.user.count({ where }),
     ]);
-    return {
-      users: users.map((user) => ({
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        avatarUrl: user.avatar,
-      })),
-      total,
-    };
+    return { users: users.map((user) => ({ id: user.id })), total };
   }
 
   async eligibleUsersFromApplication(
